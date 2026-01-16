@@ -4,6 +4,8 @@ import engine.display.Window;
 import engine.graphics.Screen;
 import engine.io.Input;
 
+import java.awt.AWTException;
+import java.awt.Robot;
 import java.awt.event.KeyEvent;
 
 /**
@@ -17,6 +19,7 @@ public abstract class Engine implements Runnable {
     protected Input input;
     protected Renderer renderer;
     protected boolean running = false;
+    protected Robot robot;
     
     // Configuration
     private final double RENDER_SCALE = 0.5;
@@ -38,6 +41,12 @@ public abstract class Engine implements Runnable {
         this.renderer = new Renderer(screen);
         
         window.addInputListener(input);
+        
+        try {
+            this.robot = new Robot();
+        } catch (AWTException e) {
+            e.printStackTrace();
+        }
     }
 
     public void start() {
@@ -66,6 +75,44 @@ public abstract class Engine implements Runnable {
             lastTime = now;
 
             while (delta >= 1) {
+                // Input Update (Mouse Locking)
+                if (window.isShowing()) {
+                    int centerX = window.getCenterX();
+                    int centerY = window.getCenterY();
+                    
+                    // The mouse position relative to screen coordinates
+                    // We rely on Input's mouseMoved/Dragged to get absolute screen coords from MouseEvent if possible
+                    // Or simpler: just let Input track relative movement, but since we reset every frame:
+                    // Delta is (CurrentMouse - Center)
+                    // Note: Java MouseEvents are component-relative. 
+                    // To do this robustly with Robot, we rely on the fact that we center the mouse every frame.
+                    
+                    // However, a simpler way without fighting AWT coords:
+                    // Just read input.getMouseX() vs Center? No, input gives component relative.
+                    // Let's use the Input class's deltas but we must Reset the mouse.
+                    
+                    // Correct FPS Logic:
+                    // 1. Read input state (which has current mouse pos).
+                    // 2. Calculate delta = InputPos - CenterPos (relative to component).
+                    // 3. Reset mouse to Center using Robot.
+                    
+                    // Since Input.java tracks absolute mouse position on component:
+                    double currentMouseX = input.getMouseX();
+                    double currentMouseY = input.getMouseY();
+                    double centerComponentX = window.getWidth() / 2.0;
+                    double centerComponentY = window.getHeight() / 2.0;
+                    
+                    double dx = currentMouseX - centerComponentX;
+                    double dy = currentMouseY - centerComponentY;
+                    
+                    input.setExplitDeltas(dx, dy);
+                    
+                    // Recenter mouse physically
+                    if (robot != null) {
+                        robot.mouseMove(centerX, centerY);
+                    }
+                }
+
                 // Game Logic Update
                 update();
                 inputUpdate();

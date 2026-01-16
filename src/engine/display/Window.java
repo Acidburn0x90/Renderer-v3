@@ -1,5 +1,10 @@
 package engine.display;
 
+import engine.io.Input;
+
+import java.awt.Cursor;
+import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.KeyListener;
 import javax.swing.JFrame;
 import java.awt.Canvas;
@@ -42,17 +47,39 @@ public class Window extends Canvas {
         frame.setIgnoreRepaint(true);
 
         frame.setLocationRelativeTo(null); // Center on screen
+//        frame.setExtendedState(JFrame.MAXIMIZED_BOTH); // Fullscreen
         frame.setVisible(true);
 
         requestFocus(); // Ensure window is focused for input/rendering
+        hideCursor();
     }
 
     /**
-     * Attaches an input listener (Keyboard) to the window.
-     * @param listener The Input class implementing KeyListener.
+     * Creates a transparent cursor to hide the mouse during gameplay.
      */
-    public void addInputListener(KeyListener listener) {
+    private void hideCursor() {
+        BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        Cursor blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
+            cursorImg, new Point(0, 0), "blank cursor");
+        frame.getContentPane().setCursor(blankCursor);
+    }
+
+    public int getCenterX() {
+        return frame.getX() + frame.getWidth() / 2;
+    }
+
+    public int getCenterY() {
+        return frame.getY() + frame.getHeight() / 2;
+    }
+
+    /**
+     * Attaches an input listener (Keyboard and Mouse) to the window.
+     * @param listener The Input class implementing KeyListener, MouseListener, and MouseMotionListener.
+     */
+    public void addInputListener(Input listener) {
         this.addKeyListener(listener);
+        this.addMouseListener(listener);
+        this.addMouseMotionListener(listener);
         frame.addKeyListener(listener);
         this.requestFocus();
     }
