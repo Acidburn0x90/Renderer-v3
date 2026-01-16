@@ -16,7 +16,7 @@ public class Main extends Engine {
     private Camera camera;
 
     public Main() {
-        super(800, 600, "Renderer v3 - Refactored");
+        super(3200, 2000, "Renderer v3 - Refactored");
     }
 
     public static void main(String[] args) {
@@ -51,6 +51,7 @@ public class Main extends Engine {
 
     @Override
     public void update() {
+        // --- Keyboard Movement ---
         double speed = 0.1;
         if (input.isKey(KeyEvent.VK_SHIFT)) speed = 0.3;
 
@@ -60,6 +61,18 @@ public class Main extends Engine {
         if (input.isKey(KeyEvent.VK_D)) camera.moveRight(speed);
         if (input.isKey(KeyEvent.VK_SPACE)) camera.moveUp(speed);
         if (input.isKey(KeyEvent.VK_CONTROL)) camera.moveDown(speed);
+
+        // --- Mouse Look ---
+        // Sensitivity factor
+        double sensitivity = 0.005;
+        double dx = input.getDeltaX();
+        double dy = input.getDeltaY();
+
+        // Invert Y-axis (Moving mouse UP should increase pitch)
+        // Invert X-axis if needed (Moving mouse LEFT should rotate LEFT)
+        if (dx != 0 || dy != 0) {
+            camera.rotate(-dy * sensitivity, -dx * sensitivity);
+        }
     }
 
     @Override
