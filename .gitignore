@@ -1,0 +1,15 @@
+# IntelliJ
+.idea/
+*.iml
+out/
+build/
+
+# Java
+*.class
+*.log
+*.ctxt
+.DS_Store
+
+# Temporary
+tmp/
+temp/
