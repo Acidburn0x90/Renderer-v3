@@ -22,21 +22,22 @@ public abstract class Engine implements Runnable {
     protected Robot robot;
     
     // Configuration
-    private final double RENDER_SCALE = 0.5;
+    protected double renderScale = 0.5;
     private final double TICKS_PER_SECOND = 60.0;
     
     private int currentWidth, currentHeight;
 
-    public Engine(int width, int height, String title) {
+    public Engine(int width, int height, String title, double renderScale) {
         // System flags for Linux/Performance
         System.setProperty("sun.java2d.opengl", "true");
         
         this.currentWidth = width;
         this.currentHeight = height;
+        this.renderScale = renderScale;
         
         // Initialize Core Components
         this.window = new Window(width, height, title);
-        this.screen = new Screen((int)(width * RENDER_SCALE), (int)(height * RENDER_SCALE));
+        this.screen = new Screen((int)(width * renderScale), (int)(height * renderScale));
         this.input = new Input();
         this.renderer = new Renderer(screen);
         
@@ -138,8 +139,8 @@ public abstract class Engine implements Runnable {
             currentWidth = window.getWidth();
             currentHeight = window.getHeight();
             if (currentWidth > 0 && currentHeight > 0) {
-                int scaledWidth = (int)(currentWidth * RENDER_SCALE);
-                int scaledHeight = (int)(currentHeight * RENDER_SCALE);
+                int scaledWidth = (int)(currentWidth * renderScale);
+                int scaledHeight = (int)(currentHeight * renderScale);
                 if (scaledWidth < 1) scaledWidth = 1;
                 if (scaledHeight < 1) scaledHeight = 1;
                 
