@@ -15,13 +15,17 @@ public class Main extends Engine {
     private Mesh meshCube;
     private Camera camera;
 
-    // CONFIGURATION
-    // 1.0 = Native Resolution (Slow at 4K)
-    // 0.5 = Half Resolution (Fast, Retro look)
-    private final double RENDER_SCALE = 0.5;
+/**
+ * The actual Game Logic.
+ * Extends the generic 'Engine' to provide specific behavior.
+ */
+public class Main extends Engine {
+    
+    private Mesh meshCube;
+    private Camera camera;
 
     public Main() {
-        super(800, 600, "Renderer v3 - Refactored");
+        super(800, 600, "Renderer v3 - Refactored", 0.5);
     }
 
     public static void main(String[] args) {
@@ -31,7 +35,7 @@ public class Main extends Engine {
     @Override
     public void init() {
         camera = new Camera();
-        camera.position.z = 2.5; // Start BACK from the center (Positive Z) to look at 0,0,0
+        camera.position.z = 5.0; // Start BACK from the center (Positive Z) to look at 0,0,0
         
         // Define the 3D Cube
         meshCube = new Mesh();
