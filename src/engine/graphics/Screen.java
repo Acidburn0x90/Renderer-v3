@@ -1,5 +1,7 @@
 package engine.graphics;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.Arrays;
@@ -13,6 +15,7 @@ public class Screen {
     private int height;
     private BufferedImage image;
     private int[] pixels;
+    private Graphics2D g; // High-performance graphics context
 
     /**
      * Initializes the Screen with a specific width and height.
@@ -27,8 +30,10 @@ public class Screen {
         // Create a new image with integer precision (No Alpha for speed, though ARGB is defined here)
         this.image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         // Link our 'pixels' array directly to the image's memory.
-        // Any change to 'pixels' is instantly reflected in 'image'.
         this.pixels = ((DataBufferInt) this.image.getRaster().getDataBuffer()).getData();
+        
+        // Initialize Graphics2D for advanced drawing operations
+        this.g = this.image.createGraphics();
     }
 
     /**
@@ -69,14 +74,24 @@ public class Screen {
      * Clears the entire screen to black (0).
      */
     public void clearPixels() {
-        Arrays.fill(pixels, 0);
+        g.setColor(Color.BLACK);
+        g.fillRect(0, 0, width, height);
     }
 
     /**
      * Clears the entire screen to a specific hex color.
      */
     public void clearPixels(String hexColor) {
-        Arrays.fill(pixels, hexStringToInt(hexColor));
+        g.setColor(new Color(hexStringToInt(hexColor)));
+        g.fillRect(0, 0, width, height);
+    }
+
+    /**
+     * Fills a solid triangle using Hardware Acceleration (Graphics2D).
+     */
+    public void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, int color) {
+        g.setColor(new Color(color));
+        g.fillPolygon(new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
     }
 
     /**

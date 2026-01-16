@@ -6,6 +6,11 @@ import engine.math.Mesh;
 import engine.math.Triangle;
 import engine.math.Vector3D;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
 /**
  * Handles the 3D rendering pipeline.
  * Responsible for transforming 3D Meshes into 2D pixels on the Screen.
@@ -31,6 +36,9 @@ public class Renderer {
      * Renders a mesh relative to a camera.
      */
     public void renderMesh(Mesh mesh, Camera camera) {
+        // List to store triangles that should be drawn this frame
+        List<Triangle> trianglesToRaster = new ArrayList<>();
+
         // Create Rotation Matrices for the Camera (Inverse rotation of the world)
         Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
         Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);
@@ -40,7 +48,6 @@ public class Renderer {
             Triangle triTranslated = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
             Triangle triRotatedYaw = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
             Triangle triView = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
-            Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
 
             // 1. TRANSLATION: World Space -> Camera-Relative Space
             for (int i = 0; i < 3; i++) {
@@ -58,7 +65,7 @@ public class Renderer {
                 triView.v[i] = matRotX.multiplyVector(triRotatedYaw.v[i]);
             }
 
-            // 3. CLIP: Near Plane Clipping (Safety Check)
+            // 3. CLIP: Near Plane Clipping (Basic)
             if (triView.v[0].z < 0.1 || triView.v[1].z < 0.1 || triView.v[2].z < 0.1) {
                 continue;
             }
@@ -71,23 +78,69 @@ public class Renderer {
             Vector3D cameraRay = triView.v[0].subtract(new Vector3D(0,0,0));
 
             if (normal.dotProduct(cameraRay) < 0.0f) {
-                
-                // 5. PROJECT: View Space -> Screen Space (NDC)
-                triProjected.v[0] = projectionMatrix.multiplyVector(triView.v[0]);
-                triProjected.v[1] = projectionMatrix.multiplyVector(triView.v[1]);
-                triProjected.v[2] = projectionMatrix.multiplyVector(triView.v[2]);
-
-                // 6. SCALE: NDC (-1 to 1) -> Pixel Coordinates
-                for (int i = 0; i < 3; i++) {
-                    triProjected.v[i].x = (triProjected.v[i].x + 1.0) * 0.5 * screen.getWidth();
-                    triProjected.v[i].y = (triProjected.v[i].y + 1.0) * 0.5 * screen.getHeight();
-                }
-
-                // 7. RASTERIZE: Draw
-                screen.drawLine((int)triProjected.v[0].x, (int)triProjected.v[0].y, (int)triProjected.v[1].x, (int)triProjected.v[1].y, 0xFFFFFF);
-                screen.drawLine((int)triProjected.v[1].x, (int)triProjected.v[1].y, (int)triProjected.v[2].x, (int)triProjected.v[2].y, 0xFFFFFF);
-                screen.drawLine((int)triProjected.v[2].x, (int)triProjected.v[2].y, (int)triProjected.v[0].x, (int)triProjected.v[0].y, 0xFFFFFF);
+                // Add to list for sorting/rasterizing
+                trianglesToRaster.add(triView);
             }
+        }
+
+        // 5. SORT: Painter's Algorithm (Sort by average Z, Far -> Near)
+        Collections.sort(trianglesToRaster, new Comparator<Triangle>() {
+            @Override
+            public int compare(Triangle t1, Triangle t2) {
+                double z1 = (t1.v[0].z + t1.v[1].z + t1.v[2].z) / 3.0;
+                double z2 = (t2.v[0].z + t2.v[1].z + t2.v[2].z) / 3.0;
+                return Double.compare(z2, z1); // Descending order
+            }
+        });
+
+        // 6. PROJECT & RASTERIZE
+        Vector3D lightDirection = new Vector3D(0, 0, -1); // Light coming from the camera direction
+        lightDirection = lightDirection.normalize();
+
+        for (Triangle triView : trianglesToRaster) {
+            Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+
+            // Lighting Calculation
+            // We need the normal again. (Optimization: Store it in a wrapper class with the triangle)
+            Vector3D line1 = triView.v[1].subtract(triView.v[0]);
+            Vector3D line2 = triView.v[2].subtract(triView.v[0]);
+            Vector3D normal = line1.crossProduct(line2).normalize();
+
+            // Dot Product for Diffuse Lighting
+            // How much is the face aligned with the light?
+            double dp = normal.dotProduct(lightDirection);
+            
+            // Clamp brightness (Ambient light 0.1 to Max 1.0)
+            // Note: Since light is (0,0,-1) and normal points back at us (0,0,-1), dot product is positive 1.
+            // If normal points away, it's culled anyway.
+            double brightness = Math.max(0.1, dp);
+            
+            // Apply brightness to white (255, 255, 255)
+            int colVal = (int)(255 * brightness);
+            // Clamp to 0-255 just in case
+            colVal = Math.min(255, Math.max(0, colVal));
+            
+            // Construct hex color 0xRRGGBB
+            int color = (colVal << 16) | (colVal << 8) | colVal;
+
+            // Project
+            triProjected.v[0] = projectionMatrix.multiplyVector(triView.v[0]);
+            triProjected.v[1] = projectionMatrix.multiplyVector(triView.v[1]);
+            triProjected.v[2] = projectionMatrix.multiplyVector(triView.v[2]);
+
+            // Scale to Screen
+            for (int i = 0; i < 3; i++) {
+                triProjected.v[i].x = (triProjected.v[i].x + 1.0) * 0.5 * screen.getWidth();
+                triProjected.v[i].y = (triProjected.v[i].y + 1.0) * 0.5 * screen.getHeight();
+            }
+
+            // Draw Solid
+            screen.fillTriangle(
+                (int)triProjected.v[0].x, (int)triProjected.v[0].y,
+                (int)triProjected.v[1].x, (int)triProjected.v[1].y,
+                (int)triProjected.v[2].x, (int)triProjected.v[2].y,
+                color
+            );
         }
     }
 }

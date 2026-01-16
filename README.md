@@ -9,16 +9,16 @@ The project is organized into logical modules to separate concerns:
 ### `src/engine/core`
 The brain of the operation.
 *   **`Engine.java`**: The abstract base class handling the Game Loop (`start`, `run`, `update`, `render`), Window management, and Input timing. It provides the skeleton that `Main` extends.
-*   **`Renderer.java`**: The graphics pipeline. It accepts a `Mesh` and a `Camera`, performs all 3D math (transformations, clipping, projection), and draws the result to the `Screen`.
-*   **`Camera.java`**: Represents the observer. Stores Position (x, y, z) and Rotation (Pitch, Yaw). Handles movement logic.
+*   **`Renderer.java`**: The graphics pipeline. It accepts a `Mesh` and a `Camera`, performs all 3D math (transformations, clipping, projection, sorting), and rasterizes the result to the `Screen`.
+*   **`Camera.java`**: Represents the observer. Stores Position (x, y, z) and Rotation (Pitch, Yaw). Handles trigonometric movement logic (FPS style).
 
 ### `src/engine/graphics`
 The raw pixel manipulation layer.
-*   **`Screen.java`**: Wraps a `BufferedImage` and its underlying `int[]` pixel buffer. Provides fast, direct access to pixels and implements rasterization algorithms (like Bresenham's Line Algorithm) with bounds checking (clipping).
+*   **`Screen.java`**: Wraps a `BufferedImage` and provides hardware-accelerated drawing methods (`fillTriangle`, `clearPixels`). Uses Java 2D `Graphics` for performance.
 
 ### `src/engine/display`
 The operating system integration.
-*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering (BufferStrategy) to prevent screen flickering during rendering.
+*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering (BufferStrategy), Fullscreen mode, and Input Listeners.
 
 ### `src/engine/math`
 The mathematical foundation.
@@ -29,7 +29,7 @@ The mathematical foundation.
 
 ### `src/engine/io`
 Input handling.
-*   **`Input.java`**: A key listener that maintains the state of the keyboard (pressed/released) for smooth polling in the game loop.
+*   **`Input.java`**: A unified listener for Keyboard and Mouse. Tracks key states and calculates Mouse Deltas for looking around.
 
 ---
 
@@ -37,56 +37,43 @@ Input handling.
 
 Every frame, the `Renderer` performs the following steps for every Triangle in a Mesh:
 
-### 1. Model Transformation
-*   **Concept**: Converting local coordinates (relative to the cube's center) to world coordinates.
-*   **Operation**: Currently, we create a **Deep Copy** of the vertices to prevent modifying the original mesh.
+### 1. Model & View Transformation
+*   **Concept**: Converting local coordinates to World Space, then to View Space (relative to Camera).
+*   **Operation**: `Vertex_View = (Vertex_World - Camera_Pos) * Camera_RotationMatrix`.
 
-### 2. View Transformation (Camera)
-*   **Concept**: Moving the world relative to the camera. If the camera moves Forward (+Z), the world moves Backward (-Z).
-*   **Operation**: `Vertex_View = Vertex_World - Camera_Position`.
-
-### 3. Near Plane Clipping
+### 2. Near Plane Clipping
 *   **Concept**: Preventing the "Division by Zero" crash. We cannot project points that are exactly at or behind the camera's eye.
-*   **Operation**: If any vertex has a `Z < 0.1`, the triangle is discarded (skipped) for safety. *Future Improvement: Split the triangle into two smaller ones instead of skipping.*
+*   **Operation**: If any vertex has a `Z < 0.1`, the triangle is discarded (skipped).
 
-### 4. Backface Culling
-*   **Concept**: Optimization. We shouldn't draw the inside faces of a solid object because the front faces block them.
-*   **Math**:
-    1.  Calculate the **Normal** (N) of the triangle surface using the **Cross Product** of two edges.
-    2.  Calculate the **Camera Ray** (V) from the eye to the triangle.
-    3.  Calculate **Dot Product** (N · V).
-    4.  If the result is `< 0`, the face is looking at us. **Draw it.**
-    5.  If `> 0`, it's looking away. **Cull it.**
+### 3. Backface Culling
+*   **Concept**: Optimization. We shouldn't draw the inside faces of a solid object.
+*   **Operation**: Calculate `DotProduct(Triangle_Normal, Camera_Ray)`. If positive, cull.
 
-### 5. Projection
-*   **Concept**: Converting 3D coordinates (X, Y, Z) into 2D Normalized Device Coordinates (NDC) between -1 and 1.
-*   **Math**: `Vertex_NDC = Vertex_View * ProjectionMatrix`.
-*   **Effect**: Objects get smaller as they get further away (`Z` division).
+### 4. Z-Sorting (Painter's Algorithm)
+*   **Concept**: Ensuring close objects appear in front of far objects.
+*   **Operation**: Collect all visible triangles, calculate their average depth, and sort them Far-to-Near before drawing.
 
-### 6. Screen Scaling
-*   **Concept**: Converting NDC (-1 to 1) to actual pixel coordinates (0 to 1920).
-*   **Operation**:
-    *   `x = (x + 1) * 0.5 * Width`
-    *   `y = (y + 1) * 0.5 * Height`
+### 5. Lighting (Flat Shading)
+*   **Concept**: Giving depth to the object.
+*   **Operation**: `Brightness = DotProduct(Triangle_Normal, Light_Direction)`. This value scales the triangle's color.
 
-### 7. Rasterization
-*   **Concept**: Turning mathematical points into actual colored pixels.
-*   **Operation**: Calls `Screen.drawLine()` to connect the vertices (Wireframe rendering).
+### 6. Projection & Rasterization
+*   **Concept**: Converting 3D coordinates to 2D pixels.
+*   **Operation**: `x = x / z`, `y = y / z`. Then call `g.fillPolygon()` to draw the solid shape.
 
 ---
 
 ## 🎮 Controls
 
-*   **W / S**: Move Camera Forward / Backward (Z-axis).
-*   **A / D**: Strafe Camera Left / Right (X-axis).
+*   **Mouse**: Look Around (Infinite Mouse Lock).
+*   **W / S**: Move Forward / Backward (Directional).
+*   **A / D**: Strafe Left / Right.
 *   **Space / Ctrl**: Fly Up / Down (Y-axis).
-*   **Shift**: Sprint (Move faster).
+*   **Shift**: Sprint.
+*   **ESC**: Quit.
 
 ## 🧮 Math Cheat Sheet
 
-*   **Dot Product**: Returns a single number describing how "aligned" two vectors are.
-    *   `1.0` = Same direction.
-    *   `0.0` = Perpendicular (90 degrees).
-    *   `-1.0` = Opposite direction.
-*   **Cross Product**: Returns a new Vector perpendicular to two others. Used to find the "Normal" (facing direction) of a surface.
-*   **Projection Matrix**: A 4x4 grid of numbers that encodes Aspect Ratio, Field of View (FOV), and Z-scaling logic to squish a 3D frustum into a 2D square.
+*   **Dot Product**: Returns a single number describing how "aligned" two vectors are. Used for Lighting and Culling.
+*   **Cross Product**: Returns a new Vector perpendicular to two others. Used to find the "Normal" of a surface.
+*   **Projection Matrix**: Encodes Aspect Ratio, Field of View (FOV), and Z-scaling logic.
