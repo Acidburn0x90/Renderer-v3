@@ -14,26 +14,21 @@ A professional-grade 3D engine built from scratch in Java without external graph
 
 ## 📂 Project Structure
 
-### `src/engine/core`
-The brain of the operation.
-*   **`Engine.java`**: The abstract base class handling the Game Loop (`start`, `run`, `update`, `render`), Window management, Input timing, and **Mouse Locking** logic.
-*   **`Renderer.java`**: The graphics pipeline. Collects triangles from all meshes, transforms them, clips them, performs **Backface Culling**, sorts them by depth, calculates lighting, and draws them.
-*   **`Camera.java`**: Represents the observer. Stores Position (x, y, z) and Rotation (Pitch, Yaw). Handles trigonometric movement logic.
+### `src/engine` (The Technology)
+*   **`core/Engine.java`**: Abstract base class for the Game Loop, Window, and Input.
+*   **`core/Renderer.java`**: The graphics pipeline (Transform, Clip, Cull, Sort, Light, Draw).
+*   **`core/Camera.java`**: Handles Position (x,y,z) and Rotation (Pitch, Yaw).
+*   **`graphics/Screen.java`**: The pixel buffer and drawing routines.
+*   **`display/Window.java`**: The OS Window (JFrame) and Input Listeners.
+*   **`math/*`**: Vector3D, Matrix4x4, Mesh, Triangle, PerlinNoise.
+*   **`io/Input.java`**: Keyboard and Mouse handling.
 
-### `src/engine/graphics`
-*   **`Screen.java`**: Wraps a `BufferedImage` and provides hardware-accelerated drawing methods (`fillTriangle`, `clearPixels`).
+### `src/game` (The Content)
+*   **`DemoGame.java`**: The specific implementation of the engine (initializes scene, handles updates).
+*   **`WorldGenerator.java`**: Helper to generate the procedural terrain mesh.
 
-### `src/engine/display`
-*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering, Fullscreen mode, and Input Listeners.
-
-### `src/engine/math`
-*   **`Vector3D.java`**: Vector arithmetic (Dot, Cross, Normalize).
-*   **`Matrix4x4.java`**: Projection and Rotation Matrices.
-*   **`PerlinNoise.java`**: Implementation of Simplex/Gradient noise for terrain generation.
-*   **`Mesh.java`**: A collection of Triangles.
-
-### `src/engine/io`
-*   **`Input.java`**: A unified listener for Keyboard and Mouse. Tracks key states and supports explicit mouse delta injection from the Engine's locking mechanism.
+### `src/Main.java`
+*   The entry point. Minimal launcher.
 
 ---
 
