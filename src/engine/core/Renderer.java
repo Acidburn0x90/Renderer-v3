@@ -106,8 +106,8 @@ public class Renderer {
 
         // FIXED SUN LIGHTING
         // We define the sun in WORLD SPACE
-        // Coming from the side/horizon to create contrast on the terrain hills
-        Vector3D worldLightDir = new Vector3D(0.2, 0.4, -1.0); 
+        // Slightly higher sun for better overall visibility
+        Vector3D worldLightDir = new Vector3D(0.2, 0.8, -0.5); 
         worldLightDir = worldLightDir.normalize();
         
         // We must rotate the Light Direction into VIEW SPACE to match the rotated triangles.
