@@ -64,20 +64,31 @@ public class Main extends Engine {
                 double y11 = noise.noise((x+1) * 0.1, 0, (z+1) * 0.1) * 10.0;
                 
                 // Create 2 Triangles for this square
+                
+                // Color based on height (using y00 as a rough approximation for the whole quad)
+                int color;
+                if (y00 < 2.0) {
+                    color = 0x228B22; // Forest Green
+                } else if (y00 < 6.0) {
+                    color = 0x696969; // Dim Gray (Mountain rock)
+                } else {
+                    color = 0xFFFFFF; // Snow
+                }
+
                 // Triangle 1 (Top-Left)
-                // Winding flipped to point UP
                 terrainMesh.triangles.add(new Triangle(
                     new Vector3D(x0, y00, z0),
                     new Vector3D(x1, y11, z1),
-                    new Vector3D(x0, y01, z1)
+                    new Vector3D(x0, y01, z1),
+                    color
                 ));
                 
                 // Triangle 2 (Bottom-Right)
-                // Winding flipped to point UP
                 terrainMesh.triangles.add(new Triangle(
                     new Vector3D(x0, y00, z0),
                     new Vector3D(x1, y10, z0),
-                    new Vector3D(x1, y11, z1)
+                    new Vector3D(x1, y11, z1),
+                    color
                 ));
             }
         }
