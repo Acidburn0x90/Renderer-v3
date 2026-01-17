@@ -99,8 +99,9 @@ public class Renderer {
         });
 
         // FIXED SUN LIGHTING
-        // We define the sun in WORLD SPACE (e.g., coming from top-left)
-        Vector3D worldLightDir = new Vector3D(0.5, 1.0, -0.5); 
+        // We define the sun in WORLD SPACE
+        // Coming from the side/horizon to create contrast on the terrain hills
+        Vector3D worldLightDir = new Vector3D(0.2, 0.4, -1.0); 
         worldLightDir = worldLightDir.normalize();
         
         // We must rotate the Light Direction into VIEW SPACE to match the rotated triangles.
@@ -123,10 +124,28 @@ public class Renderer {
             // Use the Rotated Light Vector
             double dp = normal.dotProduct(viewLightDir);
             
-            double brightness = Math.max(0.1, dp);
-            int colVal = (int)(255 * brightness);
-            colVal = Math.min(255, Math.max(0, colVal));
-            int color = (colVal << 16) | (colVal << 8) | colVal;
+            double brightness = Math.max(0.15, dp); // slightly higher ambient
+            
+            // HEIGHT BASED COLORING (Simple procedural texture)
+            // triView.v[0].y is the height relative to camera. 
+            // Since camera is at Y=-15 and Terrain is Y=0..10, the relative Y will be ~15..25.
+            // Let's grab a base color.
+            int baseColor = 0xFFFFFF; // White
+            
+            // Apply lighting to the components
+            int r = (baseColor >> 16) & 0xFF;
+            int g = (baseColor >> 8) & 0xFF;
+            int b = baseColor & 0xFF;
+            
+            r = (int)(r * brightness);
+            g = (int)(g * brightness);
+            b = (int)(b * brightness);
+            
+            r = Math.min(255, Math.max(0, r));
+            g = Math.min(255, Math.max(0, g));
+            b = Math.min(255, Math.max(0, b));
+            
+            int color = (r << 16) | (g << 8) | b;
 
             // Project
             triProjected.v[0] = projectionMatrix.multiplyVector(triView.v[0]);
