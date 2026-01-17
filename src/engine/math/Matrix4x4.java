@@ -1,33 +1,41 @@
 package engine.math;
 
-
 /**
- * Literally like all of this is just from the internet cuz its kinda standard
- * I had no idea that 4x4 can be used for translation
- * the 3x3 logic is standard but all the FOV stuff and near and far plane junk is off of the internet.
- * */
-
-
-/**
- * A 4x4 Matrix used for 3D transformations (Rotation, Translation, Scaling, Projection).
+ * A 4x4 Matrix used for 3D transformations.
+ * <p>
+ * This class handles the math required to:
+ * <ul>
+ *     <li>Rotate points in 3D space.</li>
+ *     <li>Translate (move) points.</li>
+ *     <li>Scale points.</li>
+ *     <li>Project 3D points onto a 2D plane (Perspective).</li>
+ * </ul>
+ * It uses a standard row-major or column-major logic (implementation dependent, here tailored for the engine's vector multiply).
+ * </p>
  */
 public class Matrix4x4 {
     public double[][] m = new double[4][4];
 
     /**
      * Multiplies a Vector3D by this matrix.
+     * <p>
      * This performs the full transformation pipeline including Perspective Division.
+     * effectively: Output = Matrix * InputVector
+     * </p>
      * 
      * @param i The input vector.
      * @return A new Vector3D representing the transformed point.
      */
     public Vector3D multiplyVector(Vector3D i) {
+        // Standard Matrix * Vector multiplication
         double x = i.x * m[0][0] + i.y * m[1][0] + i.z * m[2][0] + m[3][0];
         double y = i.x * m[0][1] + i.y * m[1][1] + i.z * m[2][1] + m[3][1];
         double z = i.x * m[0][2] + i.y * m[1][2] + i.z * m[2][2] + m[3][2];
         double w = i.x * m[0][3] + i.y * m[1][3] + i.z * m[2][3] + m[3][3];
 
         // Perspective Division (Normalizing to Cartesian coordinates)
+        // In projection matrices, 'w' stores the depth info. Dividing by 'w' creates the perspective effect
+        // (distant objects become smaller).
         if (w != 0.0f) {
             x /= w;
             y /= w;
@@ -38,7 +46,14 @@ public class Matrix4x4 {
     }
 
     /**
-     * Creates an Identity Matrix (diagonals are 1, rest are 0).
+     * Creates an Identity Matrix.
+     * <p>
+     * An identity matrix is the "neutral" matrix. Multiplying by it changes nothing.
+     * [1 0 0 0]
+     * [0 1 0 0]
+     * [0 0 1 0]
+     * [0 0 0 1]
+     * </p>
      */
     public static Matrix4x4 makeIdentity() {
         Matrix4x4 matrix = new Matrix4x4();
@@ -96,10 +111,14 @@ public class Matrix4x4 {
 
     /**
      * Creates a Perspective Projection Matrix.
+     * <p>
+     * This magic matrix squishes the 3D frustum (pyramid shape view) into a 2D cube (Normalized Device Coordinates).
+     * It handles Field of View and Aspect Ratio.
+     * </p>
      * @param fovDeg Field of View in degrees.
      * @param aspectRatio Screen Width / Screen Height.
-     * @param near Near clipping plane.
-     * @param far Far clipping plane.
+     * @param near Near clipping plane (closest visible distance).
+     * @param far Far clipping plane (furthest visible distance).
      */
     public static Matrix4x4 makeProjection(double fovDeg, double aspectRatio, double near, double far) {
         Matrix4x4 matrix = new Matrix4x4();

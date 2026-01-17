@@ -17,6 +17,7 @@ public class Vector3D {
 
     /**
      * Subtracts another vector from this one.
+     * Result = This - V
      * @return A new Vector3D result.
      */
     public Vector3D subtract(Vector3D v) {
@@ -25,7 +26,15 @@ public class Vector3D {
 
     /**
      * Calculates the Dot Product (Scalar product).
-     * Used for lighting calculations and angles.
+     * <p>
+     * The Dot Product tells us how much two vectors are pointing in the same direction.
+     * <ul>
+     * <li>> 0: Facing generally same direction</li>
+     * <li>0: Perpendicular (90 degrees)</li>
+     * <li>< 0: Facing generally opposite directions</li>
+     * </ul>
+     * Used heavily for lighting (Normal vs LightDir) and Backface Culling.
+     * </p>
      */
     public double dotProduct(Vector3D v) {
         return x * v.x + y * v.y + z * v.z;
@@ -33,8 +42,10 @@ public class Vector3D {
 
     /**
      * Calculates the Cross Product.
-     * Returns a vector perpendicular to both this vector and v.
-     * Used for finding surface normals.
+     * <p>
+     * The Cross Product returns a vector that is PERPENDICULAR to both input vectors.
+     * If you cross product two edges of a triangle, you get the Surface Normal (the direction the face is pointing).
+     * </p>
      */
     public Vector3D crossProduct(Vector3D v) {
         return new Vector3D(
@@ -52,7 +63,11 @@ public class Vector3D {
     }
 
     /**
-     * Normalizes the vector (scales it to length 1).
+     * Normalizes the vector.
+     * <p>
+     * This scales the vector so its length is exactly 1.0, while keeping the same direction.
+     * Essential for lighting calculations where only direction matters, not magnitude.
+     * </p>
      * @return A new normalized Vector3D, or a zero vector if length is 0.
      */
     public Vector3D normalize() {

@@ -8,14 +8,18 @@ import java.util.Arrays;
 
 /**
  * The Screen class represents the raw pixel data of our engine.
- * It acts as a framebuffer that we can manipulate directly before rendering.
+ * <p>
+ * It acts as a framebuffer (Video Memory) that we can manipulate directly before rendering.
+ * To achieve high performance in Java, we bypass standard AWT drawing for individual pixels
+ * and manipulate the integer array backing the BufferedImage directly.
+ * </p>
  */
 public class Screen {
     private int width;
     private int height;
     private BufferedImage image;
     private int[] pixels;
-    private Graphics2D g; // High-performance graphics context
+    private Graphics2D g; // High-performance graphics context for polygon filling
 
     /**
      * Initializes the Screen with a specific width and height.
@@ -27,18 +31,24 @@ public class Screen {
     public Screen(int width, int height) {
         this.width = width;
         this.height = height;
-        // Create a new image with integer precision (No Alpha for speed, though ARGB is defined here)
+        
+        // Create a new image with integer precision (TYPE_INT_RGB).
+        // We avoid Alpha channel (ARGB) for speed, as we don't need transparency for the final buffer.
         this.image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        // Link our 'pixels' array directly to the image's memory.
+        
+        // Link our 'pixels' array directly to the image's internal memory.
+        // This allows us to write 'pixels[i] = color' and have it update the image instantly
+        // without function call overhead for every pixel.
         this.pixels = ((DataBufferInt) this.image.getRaster().getDataBuffer()).getData();
         
-        // Initialize Graphics2D for advanced drawing operations
+        // Initialize Graphics2D for advanced drawing operations like fillPolygon
+        // which are hardware accelerated or highly optimized in the JVM.
         this.g = this.image.createGraphics();
     }
 
     /**
      * Getter for the underlying BufferedImage.
-     * Used by the Window to draw the final result to the screen.
+     * Used by the Window to draw the final result to the real screen.
      * @return The rendered image.
      */
     public BufferedImage getImage() {
@@ -74,6 +84,8 @@ public class Screen {
      * Clears the entire screen to black (0).
      */
     public void clearPixels() {
+        // Using Graphics2D is often faster than iterating the array in Java
+        // because it uses native code/hardware accel under the hood.
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, width, height);
     }
@@ -88,6 +100,7 @@ public class Screen {
 
     /**
      * Fills a solid triangle using Hardware Acceleration (Graphics2D).
+     * This is significantly faster than writing a software scanline algorithm in pure Java.
      */
     public void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, int color) {
         g.setColor(new Color(color));
@@ -118,7 +131,8 @@ public class Screen {
 
     /**
      * Draws a line between two points using Bresenham's Line Algorithm.
-     * This algorithm uses only integer arithmetic for high performance.
+     * This algorithm uses only integer arithmetic (add/subtract/bit-shift) for high performance.
+     * It avoids floating point math entirely.
      *
      * @param x0    Start X coordinate
      * @param y0    Start Y coordinate

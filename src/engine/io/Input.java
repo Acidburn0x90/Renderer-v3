@@ -7,17 +7,20 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 
 /**
- * Handles keyboard and mouse input by storing states and deltas.
- * Used for smooth polling in the game loop.
+ * Handles keyboard and mouse input.
+ * <p>
+ * This class acts as a bridge between the OS (Event Driven) and the Game (Polling).
+ * OS events (keyPressed) happen asynchronously. We store their state here so the
+ * Game Loop can check "is Key W pressed?" at the exact moment it needs to.
+ * </p>
  */
 public class Input implements KeyListener, MouseListener, MouseMotionListener {
     
-    // Keyboard State
+    // Keyboard State array (Index = KeyCode)
     private final boolean[] keys = new boolean[65536];
 
     // Mouse State
     private double mouseX, mouseY;
-    private double lastMouseX, lastMouseY;
     private double deltaX, deltaY;
 
     /**
@@ -31,6 +34,7 @@ public class Input implements KeyListener, MouseListener, MouseMotionListener {
         this.deltaY = dy;
     }
 
+    /** Check if a key is currently held down. */
     public boolean isKey(int keyCode) {
         return keys[keyCode];
     }
@@ -38,14 +42,10 @@ public class Input implements KeyListener, MouseListener, MouseMotionListener {
     public double getDeltaX() { return deltaX; }
     public double getDeltaY() { return deltaY; }
     
-    /**
-     * Gets the absolute X position of the mouse on the component.
-     */
+    /** Gets the absolute X position of the mouse on the component. */
     public double getMouseX() { return mouseX; }
     
-    /**
-     * Gets the absolute Y position of the mouse on the component.
-     */
+    /** Gets the absolute Y position of the mouse on the component. */
     public double getMouseY() { return mouseY; }
 
     // --- KeyListener Implementation ---
