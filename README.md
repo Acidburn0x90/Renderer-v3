@@ -2,64 +2,50 @@
 
 A professional-grade 3D engine built from scratch in Java without external graphics libraries (OpenGL/Vulkan). This project demonstrates the fundamental mathematics and architecture of 3D computer graphics.
 
-## 📂 Project Structure
+## 🌟 Key Features
 
-The project is organized into logical modules to separate concerns:
+*   **Software Rasterization**: Implements a pure Java rasterizer using `Graphics2D` for high-speed polygon filling.
+*   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).
+*   **Global Sorting**: Implements **Painter's Algorithm** with global triangle sorting to handle depth correctly across multiple objects.
+*   **Lighting**: Basic flat shading using Dot Product lighting calculations.
+*   **FPS Camera**: Free-look camera with Mouse Locking (infinite rotation) and WASD movement.
+*   **Performance**: Configurable Render Scale (e.g., render at 50% resolution and upscale) to achieve high FPS even on 4K screens.
+
+## 📂 Project Structure
 
 ### `src/engine/core`
 The brain of the operation.
-*   **`Engine.java`**: The abstract base class handling the Game Loop (`start`, `run`, `update`, `render`), Window management, and Input timing. It provides the skeleton that `Main` extends.
-*   **`Renderer.java`**: The graphics pipeline. It accepts a `Mesh` and a `Camera`, performs all 3D math (transformations, clipping, projection, sorting), and rasterizes the result to the `Screen`.
-*   **`Camera.java`**: Represents the observer. Stores Position (x, y, z) and Rotation (Pitch, Yaw). Handles trigonometric movement logic (FPS style).
+*   **`Engine.java`**: The abstract base class handling the Game Loop (`start`, `run`, `update`, `render`), Window management, Input timing, and **Mouse Locking** logic.
+*   **`Renderer.java`**: The graphics pipeline. Collects triangles from all meshes, transforms them, clips them, performs **Backface Culling**, sorts them by depth, calculates lighting, and draws them.
+*   **`Camera.java`**: Represents the observer. Stores Position (x, y, z) and Rotation (Pitch, Yaw). Handles trigonometric movement logic.
 
 ### `src/engine/graphics`
-The raw pixel manipulation layer.
-*   **`Screen.java`**: Wraps a `BufferedImage` and provides hardware-accelerated drawing methods (`fillTriangle`, `clearPixels`). Uses Java 2D `Graphics` for performance.
+*   **`Screen.java`**: Wraps a `BufferedImage` and provides hardware-accelerated drawing methods (`fillTriangle`, `clearPixels`).
 
 ### `src/engine/display`
-The operating system integration.
-*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering (BufferStrategy), Fullscreen mode, and Input Listeners.
+*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering and transparent Cursor hiding.
 
 ### `src/engine/math`
-The mathematical foundation.
-*   **`Vector3D.java`**: A 3-component vector (x, y, z) with operations for Addition, Subtraction, Dot Product, Cross Product, and Normalization.
-*   **`Matrix4x4.java`**: A 4x4 Matrix used for complex transformations. Includes factory methods for Projection Matrices and Rotation Matrices.
-*   **`Mesh.java`**: A collection of Triangles representing a 3D object.
-*   **`Triangle.java`**: A simple container for 3 `Vector3D` vertices.
+*   **`Vector3D.java`**: Vector arithmetic (Dot, Cross, Normalize).
+*   **`Matrix4x4.java`**: Projection and Rotation Matrices.
+*   **`Mesh.java`**: A collection of Triangles.
 
 ### `src/engine/io`
-Input handling.
-*   **`Input.java`**: A unified listener for Keyboard and Mouse. Tracks key states and calculates Mouse Deltas for looking around.
+*   **`Input.java`**: A unified listener for Keyboard and Mouse. Tracks key states and supports explicit mouse delta injection from the Engine's locking mechanism.
 
 ---
 
 ## 🚀 The Rendering Pipeline
 
-Every frame, the `Renderer` performs the following steps for every Triangle in a Mesh:
+Every frame, the `Renderer` performs the following steps:
 
-### 1. Model & View Transformation
-*   **Concept**: Converting local coordinates to World Space, then to View Space (relative to Camera).
-*   **Operation**: `Vertex_View = (Vertex_World - Camera_Pos) * Camera_RotationMatrix`.
-
-### 2. Near Plane Clipping
-*   **Concept**: Preventing the "Division by Zero" crash. We cannot project points that are exactly at or behind the camera's eye.
-*   **Operation**: If any vertex has a `Z < 0.1`, the triangle is discarded (skipped).
-
-### 3. Backface Culling
-*   **Concept**: Optimization. We shouldn't draw the inside faces of a solid object.
-*   **Operation**: Calculate `DotProduct(Triangle_Normal, Camera_Ray)`. If positive, cull.
-
-### 4. Z-Sorting (Painter's Algorithm)
-*   **Concept**: Ensuring close objects appear in front of far objects.
-*   **Operation**: Collect all visible triangles, calculate their average depth, and sort them Far-to-Near before drawing.
-
-### 5. Lighting (Flat Shading)
-*   **Concept**: Giving depth to the object.
-*   **Operation**: `Brightness = DotProduct(Triangle_Normal, Light_Direction)`. This value scales the triangle's color.
-
-### 6. Projection & Rasterization
-*   **Concept**: Converting 3D coordinates to 2D pixels.
-*   **Operation**: `x = x / z`, `y = y / z`. Then call `g.fillPolygon()` to draw the solid shape.
+1.  **Transformation**: Converts all 3D models into View Space (relative to camera).
+2.  **Clipping**: Discards triangles behind the camera (Near Plane Clipping) to prevent crashes.
+3.  **Culling**: Calculates the Dot Product of the face normal and camera ray. If the face looks away, it is ignored (Backface Culling).
+4.  **Collection**: Visible triangles are added to a **Global Render List**.
+5.  **Sorting**: The global list is sorted by average Z-depth (Far to Near).
+6.  **Lighting**: Brightness is calculated: `dot(Normal, LightDir)`.
+7.  **Rasterization**: Triangles are projected to 2D and drawn to the screen buffer.
 
 ---
 
@@ -72,8 +58,12 @@ Every frame, the `Renderer` performs the following steps for every Triangle in a
 *   **Shift**: Sprint.
 *   **ESC**: Quit.
 
-## 🧮 Math Cheat Sheet
+## 🛠️ Usage
 
-*   **Dot Product**: Returns a single number describing how "aligned" two vectors are. Used for Lighting and Culling.
-*   **Cross Product**: Returns a new Vector perpendicular to two others. Used to find the "Normal" of a surface.
-*   **Projection Matrix**: Encodes Aspect Ratio, Field of View (FOV), and Z-scaling logic.
+To run the engine:
+1.  Open the project in IntelliJ or any Java IDE.
+2.  Run `src/Main.java`.
+3.  Enjoy the Stress Test (100 Cubes)!
+
+---
+*Created as a learning project to understand the internals of 3D Graphics Engines.*
