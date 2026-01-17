@@ -21,8 +21,10 @@ public class Input implements KeyListener, MouseListener, MouseMotionListener {
     private double deltaX, deltaY;
 
     /**
-     * Updates input states. Should be called once per frame/tick.
-     * Calculates mouse deltas since the last update.
+     * Sets explicit mouse deltas. 
+     * Used by the Engine to inject calculated movement when Mouse Locking is active.
+     * @param dx The X difference.
+     * @param dy The Y difference.
      */
     public void setExplitDeltas(double dx, double dy) {
         this.deltaX = dx;
@@ -36,7 +38,14 @@ public class Input implements KeyListener, MouseListener, MouseMotionListener {
     public double getDeltaX() { return deltaX; }
     public double getDeltaY() { return deltaY; }
     
+    /**
+     * Gets the absolute X position of the mouse on the component.
+     */
     public double getMouseX() { return mouseX; }
+    
+    /**
+     * Gets the absolute Y position of the mouse on the component.
+     */
     public double getMouseY() { return mouseY; }
 
     // --- KeyListener Implementation ---
