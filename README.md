@@ -7,10 +7,10 @@ A professional-grade 3D engine built from scratch in Java without external graph
 *   **Software Rasterization**: Implements a pure Java rasterizer using `Graphics2D` for high-speed polygon filling.
 *   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).
 *   **Global Sorting**: Implements **Painter's Algorithm** with global triangle sorting to handle depth correctly across multiple objects.
-*   **Procedural Terrain**: Uses **Perlin Noise** to generate infinite (well, 40x40) rolling hills.
-*   **Lighting**: Fixed Directional Lighting (Sun) calculated in World Space, supporting camera rotation.
-*   **FPS Camera**: Free-look camera with Mouse Locking (infinite rotation) and WASD movement.
-*   **Performance**: Configurable Render Scale (e.g., render at 50% resolution and upscale) to achieve high FPS even on 4K screens.
+*   **Procedural Terrain**: Uses **Perlin Noise** to generate infinite (40x40 chunk) rolling hills.
+*   **Lighting**: Fixed Directional Lighting (Sun) calculated in World Space, rotated into View Space for correct shading relative to the camera. Includes height-based terrain coloring.
+*   **FPS Camera**: Free-look camera with Mouse Locking (infinite rotation) and WASD movement using proper trigonometry.
+*   **Performance**: Configurable Render Scale (e.g., render at 33% resolution and upscale) to achieve high FPS even on 4K screens.
 
 ## 📂 Project Structure
 
@@ -22,6 +22,9 @@ The brain of the operation.
 
 ### `src/engine/graphics`
 *   **`Screen.java`**: Wraps a `BufferedImage` and provides hardware-accelerated drawing methods (`fillTriangle`, `clearPixels`).
+
+### `src/engine/display`
+*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering, Fullscreen mode, and Input Listeners.
 
 ### `src/engine/math`
 *   **`Vector3D.java`**: Vector arithmetic (Dot, Cross, Normalize).
@@ -44,10 +47,10 @@ Every frame, the `Renderer` performs the following steps:
 4.  **Collection**: Visible triangles are added to a **Global Render List**.
 5.  **Sorting**: The global list is sorted by average Z-depth (Far to Near).
 6.  **Lighting**: 
-    *   Sun Vector is defined in World Space.
+    *   Sun Vector is defined in World Space (e.g. Horizon).
     *   Rotated into View Space by the Camera Matrix.
     *   `Brightness = DotProduct(Normal, ViewSunVector)`.
-7.  **Rasterization**: Triangles are projected to 2D and drawn to the screen buffer.
+7.  **Rasterization**: Triangles are projected to 2D and drawn to the screen buffer using `g.fillPolygon`.
 
 ---
 

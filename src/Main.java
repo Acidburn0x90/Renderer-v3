@@ -26,7 +26,7 @@ public class Main extends Engine {
         super(1920, 1080, "Renderer v3 - Terrain Demo", (double) 1/3);
     }
 
-    static void main() {
+    public static void main(String[] args) {
         new Main().start();
     }
 
