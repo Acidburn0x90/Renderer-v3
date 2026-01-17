@@ -106,8 +106,8 @@ public class Renderer {
 
         // FIXED SUN LIGHTING
         // We define the sun in WORLD SPACE
-        // Slightly higher sun for better overall visibility
-        Vector3D worldLightDir = new Vector3D(0.2, 0.8, -0.5); 
+        // High noon sun for maximum brightness
+        Vector3D worldLightDir = new Vector3D(0.2, 1.5, -0.5); 
         worldLightDir = worldLightDir.normalize();
         
         // We must rotate the Light Direction into VIEW SPACE to match the rotated triangles.
@@ -130,7 +130,7 @@ public class Renderer {
             // Use the Rotated Light Vector
             double dp = normal.dotProduct(viewLightDir);
             
-            double brightness = Math.max(0.2, dp); // Ambient 0.2
+            double brightness = Math.max(0.4, dp); // Ambient 0.4 (Very Bright)
             
             // Apply lighting to the Triangle's own color
             int baseColor = triView.color;
