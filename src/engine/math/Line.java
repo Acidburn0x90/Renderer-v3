@@ -4,6 +4,7 @@ import engine.graphics.Screen;
 
 /**
  * Represents a straight line between two points in 2D space.
+ * Primarily used for debugging or UI.
  */
 public class Line extends Shape {
 

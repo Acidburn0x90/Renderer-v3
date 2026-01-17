@@ -13,17 +13,32 @@ import java.util.List;
 
 /**
  * Handles the 3D rendering pipeline.
- * Responsible for transforming 3D Meshes into 2D pixels on the Screen.
+ * <p>
+ * This class is responsible for the full "Software Rasterization" pipeline.
+ * It takes 3D Meshes and converts them into 2D colored pixels on the Screen.
+ * </p>
+ * 
+ * <h3>The Pipeline Steps:</h3>
+ * <ol>
+ *     <li><b>Transform</b>: Convert Model Space -> World Space -> View Space (Camera relative).</li>
+ *     <li><b>Clip</b>: Remove triangles that are behind the camera (Near Plane Clipping).</li>
+ *     <li><b>Cull</b>: Ignore triangles facing away from the camera (Backface Culling).</li>
+ *     <li><b>Project</b>: Convert 3D View Space -> 2D Screen Space (Perspective Projection).</li>
+ *     <li><b>Sort</b>: Sort triangles by depth (Painter's Algorithm) to draw far objects first.</li>
+ *     <li><b>Rasterize</b>: Fill the 2D triangles with color.</li>
+ * </ol>
  */
 public class Renderer {
     private final Screen screen;
     private Matrix4x4 projectionMatrix;
     
-    // Global list of triangles to render this frame (for global sorting)
+    // Global list of triangles to render this frame.
+    // We collect ALL valid triangles from ALL meshes here so we can sort them globally.
     private final List<Triangle> trianglesToRaster = new ArrayList<>();
 
     public Renderer(Screen screen) {
         this.screen = screen;
+        // Initialize Projection Matrix (90 FOV, Aspect Ratio, Near 0.1, Far 1000.0)
         this.projectionMatrix = Matrix4x4.makeProjection(90.0, (double)screen.getHeight() / screen.getWidth(), 0.1, 1000.0);
     }
 
@@ -35,20 +50,23 @@ public class Renderer {
      * Clears the screen and resets the triangle buffer. Call this at the start of render().
      */
     public void beginFrame() {
-        screen.clearPixels("#000000");
+        screen.clearPixels("#000000"); // Clear to Black
         trianglesToRaster.clear();
     }
 
     /**
-     * Processes a mesh and adds its visible triangles to the buffer.
+     * Processes a mesh: Transforms, Clips, Culls, and adds visible triangles to the buffer.
+     * Does NOT draw them yet.
      */
     public void renderMesh(Mesh mesh, Camera camera) {
+        // Create Rotation Matrices based on Camera Orientation
+        // We rotate the world OPPOSITE to the camera rotation to simulate looking around.
         Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
         Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);
 
         for (Triangle tri : mesh.triangles) {
+            // Temporary triangles for pipeline stages
             Triangle triTranslated = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
-            // Preserve color
             triTranslated.color = tri.color;
             
             Triangle triRotatedYaw = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
@@ -57,7 +75,8 @@ public class Renderer {
             Triangle triView = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
             triView.color = tri.color;
 
-            // 1. TRANSLATION
+            // 1. TRANSLATION (View Space)
+            // Move the world so the camera is at (0,0,0).
             for (int i = 0; i < 3; i++) {
                 triTranslated.v[i] = new Vector3D(
                     tri.v[i].x - camera.position.x,
@@ -66,25 +85,33 @@ public class Renderer {
                 );
             }
 
-            // 2. ROTATION
+            // 2. ROTATION (View Space)
+            // Rotate vertices based on Camera Yaw and Pitch.
             for (int i = 0; i < 3; i++) {
                 triRotatedYaw.v[i] = matRotY.multiplyVector(triTranslated.v[i]);
                 triView.v[i] = matRotX.multiplyVector(triRotatedYaw.v[i]);
             }
 
-            // 3. CLIP
+            // 3. CLIP (Near Plane)
+            // If a triangle is behind the camera (Z < 0.1), discard it.
+            // Simple implementation: if ANY vertex is behind, discard. (Proper clipping would slice the triangle).
             if (triView.v[0].z < 0.1 || triView.v[1].z < 0.1 || triView.v[2].z < 0.1) {
                 continue;
             }
 
-            // 4. CULL
+            // 4. CULL (Backface Culling)
+            // Determine if the triangle is facing the camera.
+            // Calculate Surface Normal.
             Vector3D line1 = triView.v[1].subtract(triView.v[0]);
             Vector3D line2 = triView.v[2].subtract(triView.v[0]);
             Vector3D normal = line1.crossProduct(line2).normalize();
+            
+            // Vector from Camera (0,0,0) to Triangle.
             Vector3D cameraRay = triView.v[0].subtract(new Vector3D(0,0,0));
 
+            // Dot Product < 0 means the normal is pointing towards the camera.
             if (normal.dotProduct(cameraRay) < 0.0f) {
-                // Add to list for sorting later. 
+                // Triangle is visible, add to list for sorting later.
                 trianglesToRaster.add(triView);
             }
         }
@@ -94,7 +121,8 @@ public class Renderer {
      * Sorts the accumulated triangles and rasterizes them to the screen. Call this at the end of render().
      */
     public void endFrame(Camera camera) {
-        // 5. SORT: Painter's Algorithm (Sort by average Z, Far -> Near)
+        // 5. SORT: Painter's Algorithm
+        // Sort triangles from Farthest to Nearest (Z-depth) so near triangles draw on top of far ones.
         Collections.sort(trianglesToRaster, new Comparator<Triangle>() {
             @Override
             public int compare(Triangle t1, Triangle t2) {
@@ -104,14 +132,13 @@ public class Renderer {
             }
         });
 
-        // FIXED SUN LIGHTING
-        // We define the sun in WORLD SPACE
-        // High noon sun for maximum brightness
+        // FIXED SUN LIGHTING SETUP
+        // We define the sun direction in WORLD SPACE.
         Vector3D worldLightDir = new Vector3D(0.2, 1.5, -0.5); 
         worldLightDir = worldLightDir.normalize();
         
         // We must rotate the Light Direction into VIEW SPACE to match the rotated triangles.
-        // If the camera rotates left, the "Sun" vector relative to the camera must rotate right.
+        // e.g. If the camera rotates Left, the Sun (relative to camera) must rotate Right.
         Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
         Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);
         
@@ -122,19 +149,20 @@ public class Renderer {
         for (Triangle triView : trianglesToRaster) {
             Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
 
-            // Lighting Calculation (View Space)
+            // --- LIGHTING CALCULATION (View Space) ---
             Vector3D line1 = triView.v[1].subtract(triView.v[0]);
             Vector3D line2 = triView.v[2].subtract(triView.v[0]);
             Vector3D normal = line1.crossProduct(line2).normalize();
             
-            // Use the Rotated Light Vector
+            // Dot Product of Surface Normal and Light Direction.
+            // 1.0 = Facing Light directly. 0.0 = Perpendicular. -1.0 = Facing away.
             double dp = normal.dotProduct(viewLightDir);
             
-            double brightness = Math.max(0.4, dp); // Ambient 0.4 (Very Bright)
+            // Clamp brightness (Ambient light 0.4 ensures nothing is pitch black).
+            double brightness = Math.max(0.4, dp); 
             
-            // Apply lighting to the Triangle's own color
+            // Apply lighting to the Triangle's hex color
             int baseColor = triView.color;
-            
             int r = (baseColor >> 16) & 0xFF;
             int g = (baseColor >> 8) & 0xFF;
             int b = baseColor & 0xFF;
@@ -149,18 +177,20 @@ public class Renderer {
             
             int color = (r << 16) | (g << 8) | b;
 
-            // Project
+            // --- PROJECTION ---
+            // Matrix Multiply: View Space (3D) -> Projection Space (Homogeneous Clip Space)
             triProjected.v[0] = projectionMatrix.multiplyVector(triView.v[0]);
             triProjected.v[1] = projectionMatrix.multiplyVector(triView.v[1]);
             triProjected.v[2] = projectionMatrix.multiplyVector(triView.v[2]);
 
-            // Scale to Screen
+            // --- SCALE TO SCREEN ---
+            // Convert normalized coordinates (-1 to +1) to pixel coordinates (0 to Width/Height).
             for (int i = 0; i < 3; i++) {
                 triProjected.v[i].x = (triProjected.v[i].x + 1.0) * 0.5 * screen.getWidth();
                 triProjected.v[i].y = (triProjected.v[i].y + 1.0) * 0.5 * screen.getHeight();
             }
 
-            // Draw Solid
+            // --- DRAW ---
             screen.fillTriangle(
                 (int)triProjected.v[0].x, (int)triProjected.v[0].y,
                 (int)triProjected.v[1].x, (int)triProjected.v[1].y,
