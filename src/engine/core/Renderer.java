@@ -98,7 +98,9 @@ public class Renderer {
             }
         });
 
-        Vector3D lightDirection = new Vector3D(0, 0, -1); 
+        // FIXED SUN LIGHTING
+        // Direction: Coming from Top-Right-Back
+        Vector3D lightDirection = new Vector3D(0.5, 1.0, -0.5); 
         lightDirection = lightDirection.normalize();
 
         // 6. PROJECT & RASTERIZE
