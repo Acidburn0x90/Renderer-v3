@@ -15,7 +15,7 @@ import java.util.List;
  */
 public class Main extends Engine {
     
-    // We will render a LIST of meshes now
+    // We will render a LIST of meshes nowys
     private List<Mesh> meshes;
     private Camera camera;
 
@@ -23,7 +23,7 @@ public class Main extends Engine {
         // CHANGE RENDER SCALE TO GET A RETRO LOOK
         // A scale of 1 is full resolution
         // A scale of 0.5 renders at half resolution and upscales to fit original screen
-        super(1920, 1080, "Renderer v3 - Terrain Demo", (double) 1/3);
+        super(1920, 1080, "Renderer v3 - Terrain Demo", (double) 1/4);
     }
 
     public static void main(String[] args) {
@@ -65,14 +65,14 @@ public class Main extends Engine {
                 
                 // Create 2 Triangles for this square
                 
-                // Color based on height (using y00 as a rough approximation for the whole quad)
+                // Color based on height (widened ranges for visibility)
                 int color;
-                if (y00 < 2.0) {
-                    color = 0x228B22; // Forest Green
-                } else if (y00 < 6.0) {
-                    color = 0x696969; // Dim Gray (Mountain rock)
+                if (y00 < 0.0) {
+                    color = 0x2E8B57; // Sea Green (Valley)
+                } else if (y00 < 4.0) {
+                    color = 0x8B4513; // Saddle Brown (Slopes)
                 } else {
-                    color = 0xFFFFFF; // Snow
+                    color = 0xFFFFFF; // Snow (Peaks)
                 }
 
                 // Triangle 1 (Top-Left)
