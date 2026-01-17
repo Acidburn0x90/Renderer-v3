@@ -118,6 +118,6 @@ public class Main extends Engine {
         }
         
         // Sort and draw everything
-        renderer.endFrame();
+        renderer.endFrame(camera);
     }
 }

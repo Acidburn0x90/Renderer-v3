@@ -87,7 +87,7 @@ public class Renderer {
     /**
      * Sorts the accumulated triangles and rasterizes them to the screen. Call this at the end of render().
      */
-    public void endFrame() {
+    public void endFrame(Camera camera) {
         // 5. SORT: Painter's Algorithm (Sort by average Z, Far -> Near)
         Collections.sort(trianglesToRaster, new Comparator<Triangle>() {
             @Override
@@ -99,19 +99,30 @@ public class Renderer {
         });
 
         // FIXED SUN LIGHTING
-        // Direction: Coming from Top-Right-Back
-        Vector3D lightDirection = new Vector3D(0.5, 1.0, -0.5); 
-        lightDirection = lightDirection.normalize();
+        // We define the sun in WORLD SPACE (e.g., coming from top-left)
+        Vector3D worldLightDir = new Vector3D(0.5, 1.0, -0.5); 
+        worldLightDir = worldLightDir.normalize();
+        
+        // We must rotate the Light Direction into VIEW SPACE to match the rotated triangles.
+        // If the camera rotates left, the "Sun" vector relative to the camera must rotate right.
+        Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
+        Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);
+        
+        Vector3D viewLightDir = matRotY.multiplyVector(worldLightDir);
+        viewLightDir = matRotX.multiplyVector(viewLightDir);
 
         // 6. PROJECT & RASTERIZE
         for (Triangle triView : trianglesToRaster) {
             Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
 
-            // Lighting Calculation
+            // Lighting Calculation (View Space)
             Vector3D line1 = triView.v[1].subtract(triView.v[0]);
             Vector3D line2 = triView.v[2].subtract(triView.v[0]);
             Vector3D normal = line1.crossProduct(line2).normalize();
-            double dp = normal.dotProduct(lightDirection);
+            
+            // Use the Rotated Light Vector
+            double dp = normal.dotProduct(viewLightDir);
+            
             double brightness = Math.max(0.1, dp);
             int colVal = (int)(255 * brightness);
             colVal = Math.min(255, Math.max(0, colVal));

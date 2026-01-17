@@ -7,7 +7,8 @@ A professional-grade 3D engine built from scratch in Java without external graph
 *   **Software Rasterization**: Implements a pure Java rasterizer using `Graphics2D` for high-speed polygon filling.
 *   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).
 *   **Global Sorting**: Implements **Painter's Algorithm** with global triangle sorting to handle depth correctly across multiple objects.
-*   **Lighting**: Basic flat shading using Dot Product lighting calculations.
+*   **Procedural Terrain**: Uses **Perlin Noise** to generate infinite (well, 40x40) rolling hills.
+*   **Lighting**: Fixed Directional Lighting (Sun) calculated in World Space, supporting camera rotation.
 *   **FPS Camera**: Free-look camera with Mouse Locking (infinite rotation) and WASD movement.
 *   **Performance**: Configurable Render Scale (e.g., render at 50% resolution and upscale) to achieve high FPS even on 4K screens.
 
@@ -22,12 +23,10 @@ The brain of the operation.
 ### `src/engine/graphics`
 *   **`Screen.java`**: Wraps a `BufferedImage` and provides hardware-accelerated drawing methods (`fillTriangle`, `clearPixels`).
 
-### `src/engine/display`
-*   **`Window.java`**: Manages the `JFrame` and `Canvas`. Handles Double Buffering and transparent Cursor hiding.
-
 ### `src/engine/math`
 *   **`Vector3D.java`**: Vector arithmetic (Dot, Cross, Normalize).
 *   **`Matrix4x4.java`**: Projection and Rotation Matrices.
+*   **`PerlinNoise.java`**: Implementation of Simplex/Gradient noise for terrain generation.
 *   **`Mesh.java`**: A collection of Triangles.
 
 ### `src/engine/io`
@@ -44,7 +43,10 @@ Every frame, the `Renderer` performs the following steps:
 3.  **Culling**: Calculates the Dot Product of the face normal and camera ray. If the face looks away, it is ignored (Backface Culling).
 4.  **Collection**: Visible triangles are added to a **Global Render List**.
 5.  **Sorting**: The global list is sorted by average Z-depth (Far to Near).
-6.  **Lighting**: Brightness is calculated: `dot(Normal, LightDir)`.
+6.  **Lighting**: 
+    *   Sun Vector is defined in World Space.
+    *   Rotated into View Space by the Camera Matrix.
+    *   `Brightness = DotProduct(Normal, ViewSunVector)`.
 7.  **Rasterization**: Triangles are projected to 2D and drawn to the screen buffer.
 
 ---
@@ -63,7 +65,7 @@ Every frame, the `Renderer` performs the following steps:
 To run the engine:
 1.  Open the project in IntelliJ or any Java IDE.
 2.  Run `src/Main.java`.
-3.  Enjoy the Stress Test (100 Cubes)!
+3.  Enjoy the Perlin Noise Terrain!
 
 ---
 *Created as a learning project to understand the internals of 3D Graphics Engines.*
