@@ -48,8 +48,14 @@ public class Renderer {
 
         for (Triangle tri : mesh.triangles) {
             Triangle triTranslated = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+            // Preserve color
+            triTranslated.color = tri.color;
+            
             Triangle triRotatedYaw = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+            triRotatedYaw.color = tri.color;
+            
             Triangle triView = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+            triView.color = tri.color;
 
             // 1. TRANSLATION
             for (int i = 0; i < 3; i++) {
@@ -124,15 +130,11 @@ public class Renderer {
             // Use the Rotated Light Vector
             double dp = normal.dotProduct(viewLightDir);
             
-            double brightness = Math.max(0.15, dp); // slightly higher ambient
+            double brightness = Math.max(0.2, dp); // Ambient 0.2
             
-            // HEIGHT BASED COLORING (Simple procedural texture)
-            // triView.v[0].y is the height relative to camera. 
-            // Since camera is at Y=-15 and Terrain is Y=0..10, the relative Y will be ~15..25.
-            // Let's grab a base color.
-            int baseColor = 0xFFFFFF; // White
+            // Apply lighting to the Triangle's own color
+            int baseColor = triView.color;
             
-            // Apply lighting to the components
             int r = (baseColor >> 16) & 0xFF;
             int g = (baseColor >> 8) & 0xFF;
             int b = baseColor & 0xFF;
