@@ -70,6 +70,19 @@ public class Screen {
                              int x2, int y2, double z2, double l2,
                              int x3, int y3, double z3, double l3,
                              int color) {
+        // Default to full screen
+        fillTriangle(x1, y1, z1, l1, x2, y2, z2, l2, x3, y3, z3, l3, color, 0, width, 0, height);
+    }
+
+    /**
+     * Multi-Threaded Rasterizer variant (Tile-Based).
+     * Only draws the part of the triangle that falls within [minX, maxX) and [minY, maxY).
+     */
+    public void fillTriangle(int x1, int y1, double z1, double l1,
+                             int x2, int y2, double z2, double l2,
+                             int x3, int y3, double z3, double l3,
+                             int color,
+                             int minX, int maxX, int minY, int maxY) {
         // 1. Sort Vertices by Y (Top to Bottom) using a simple swap bubble-sort
         // We want v1 to be top (min Y), v3 to be bottom (max Y)
         if (y1 > y2) {
@@ -90,6 +103,16 @@ public class Screen {
             double tz = z2; z2 = z3; z3 = tz;
             double tl = l2; l2 = l3; l3 = tl;
         }
+
+        // Optimization: Bounding Box Check (X and Y)
+        // If the triangle is completely outside this tile, skip it immediately.
+        // Y-check:
+        if (y3 < minY || y1 >= maxY) return;
+        
+        // X-check: find min/max X of the triangle
+        int triMinX = Math.min(x1, Math.min(x2, x3));
+        int triMaxX = Math.max(x1, Math.max(x2, x3));
+        if (triMaxX < minX || triMinX >= maxX) return;
 
         // 2. Rasterize
         // Triangle is split into two parts: Top-Flat and Bottom-Flat by the middle vertex (v2).
@@ -125,19 +148,70 @@ public class Screen {
         double curZ_B = z1;
         double curL_B = l1;
 
-        for (int y = y1; y < y2; y++) {
-            drawScanline(y, (int)curX_A, curZ_A, curL_A, (int)curX_B, curZ_B, curL_B, color);
+        // We only loop through lines that are actually inside our slice [minY, maxY)
+        // However, we MUST calculate the start values (curX, curZ) correctly if we skip lines at the top.
+        
+        // Calculate start/end Y for the top half
+        int startY = y1;
+        int endY = y2;
+        
+        // Pre-stepping: If the triangle starts above our slice, we must fast-forward the math.
+        if (startY < minY) {
+            int skip = minY - startY;
+            curX_A += dX13 * skip; curZ_A += dZ13 * skip; curL_A += dL13 * skip;
+            curX_B += dX12 * skip; curZ_B += dZ12 * skip; curL_B += dL12 * skip;
+            startY = minY;
+        }
+        if (endY > maxY) endY = maxY; // Clip bottom
+
+        for (int y = startY; y < endY; y++) {
+            drawScanline(y, (int)curX_A, curZ_A, curL_A, (int)curX_B, curZ_B, curL_B, color, minX, maxX);
             curX_A += dX13; curZ_A += dZ13; curL_A += dL13;
             curX_B += dX12; curZ_B += dZ12; curL_B += dL12;
         }
 
         // --- Bottom Half (v2 to v3) ---
+        // We need to re-calculate B start values because they originate from v2, not v1.
+        // A continues from v1.
+        
+        // If we completely skipped the top half, we need to advance A to y2
+        if (y1 < y2 && y2 < minY) {
+             // We are starting LATE in the bottom half.
+             // A needs to catch up from y1 to y2... then from y2 to minY.
+             // Actually, A is continuous v1->v3.
+             // So if we start loop at `minY`, A just needs to advance (minY - y1) steps.
+             // BUT, curX_A variable above was already advanced to `endY` (which might be y2 or maxY).
+             
+             // Simplest approach: Reset A to v1 and advance full distance to startY of this loop.
+             curX_A = x1 + dX13 * (Math.max(y2, minY) - y1);
+             curZ_A = z1 + dZ13 * (Math.max(y2, minY) - y1);
+             curL_A = l1 + dL13 * (Math.max(y2, minY) - y1);
+        }
+        
+        // B starts fresh at v2
         curX_B = x2;
         curZ_B = z2;
         curL_B = l2;
         
-        for (int y = y2; y <= y3; y++) {
-            drawScanline(y, (int)curX_A, curZ_A, curL_A, (int)curX_B, curZ_B, curL_B, color);
+        startY = y2;
+        endY = y3;
+        
+        if (startY < minY) {
+             int skip = minY - startY;
+             // A has already been advanced by the previous loop logic or the catch-up logic
+             if (y2 >= minY) { 
+                 // If we didn't skip the top half, A is already at y2.
+                 // We just need to skip inside this loop.
+                 curX_A += dX13 * skip; curZ_A += dZ13 * skip; curL_A += dL13 * skip;
+             }
+             
+             curX_B += dX23 * skip; curZ_B += dZ23 * skip; curL_B += dL23 * skip;
+             startY = minY;
+        }
+        if (endY > maxY) endY = maxY;
+
+        for (int y = startY; y <= endY; y++) {
+            drawScanline(y, (int)curX_A, curZ_A, curL_A, (int)curX_B, curZ_B, curL_B, color, minX, maxX);
             curX_A += dX13; curZ_A += dZ13; curL_A += dL13;
             curX_B += dX23; curZ_B += dZ23; curL_B += dL23;
         }
@@ -147,7 +221,8 @@ public class Screen {
      * Draws a single horizontal line, interpolating Z and Lighting, and checking the Z-Buffer.
      */
     private void drawScanline(int y, int xStart, double zStart, double lStart, 
-                                     int xEnd, double zEnd, double lEnd, int color) {
+                                     int xEnd, double zEnd, double lEnd, int color,
+                                     int minX, int maxX) {
         // Ensure Left-to-Right
         if (xStart > xEnd) {
             int ti = xStart; xStart = xEnd; xEnd = ti;
@@ -155,7 +230,7 @@ public class Screen {
             double tl = lStart; lStart = lEnd; lEnd = tl;
         }
 
-        // Clipping (Y-axis)
+        // Clipping (Y-axis) - redundant if called from fillTriangle with correct bounds, but safe.
         if (y < 0 || y >= height) return;
 
         // Calculate Steps for interpolation
@@ -169,8 +244,8 @@ public class Screen {
         double curL = lStart;
 
         // X-axis Clipping bounds
-        int realXStart = Math.max(0, xStart);
-        int realXEnd = Math.min(this.width - 1, xEnd);
+        int realXStart = Math.max(minX, xStart);
+        int realXEnd = Math.min(maxX - 1, xEnd);
         
         // Adjust start values if we clipped the start
         double offset = (realXStart - xStart);

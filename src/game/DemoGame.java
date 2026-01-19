@@ -37,7 +37,7 @@ public class DemoGame extends Engine {
         // Initialize Engine with specific window settings
         // Render scale 0.25 (1/4) means for a 2560x1440 window, we render at 640x360.
         // This gives a cool "Retro" pixelated look and ensures very high FPS (hundreds/thousands).
-        super(1920, 1080, "Renderer v3 - Terrain Demo", (double) 1/4);
+        super(3200, 2000, "Renderer v3 - Terrain Demo", (double) 1/4);
     }
 
     /**
@@ -144,6 +144,10 @@ public class DemoGame extends Engine {
         for (Mesh mesh : meshes) {
             renderer.renderMesh(mesh, camera);
         }
+        
+        // FLUSH: Draw all buffered triangles (The Separation of Concerns)
+        // This is where Multi-Threading will hook in later.
+        renderer.draw();
 
         // --- FPS Counter ---
         frames++;

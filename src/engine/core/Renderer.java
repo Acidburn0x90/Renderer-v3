@@ -11,6 +11,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Handles the 3D rendering pipeline.
  * <p>
@@ -31,6 +36,14 @@ import java.util.List;
 public class Renderer {
     private final Screen screen;
     private Matrix4x4 projectionMatrix;
+    
+    // --- MULTI-THREADING ---
+    // We automatically detect the number of cores (e.g. 22) and create a thread pool.
+    private final int NUM_THREADS;
+    private final ExecutorService threadPool;
+    
+    // Tile Configuration for Dynamic Load Balancing
+    private static final int TILE_SIZE = 64;
     
     // --- CACHE (Object Pool) ---
     // Reusable objects to prevent Garbage Collection spikes.
@@ -56,11 +69,27 @@ public class Renderer {
     
     // Frustum Culling
     private final ViewFrustum frustum = new ViewFrustum();
+    
+    // --- RENDER QUEUE ---
+    // Stores processed triangles to be rasterized later (potentially by multiple threads).
+    // We reuse these objects to strictly avoid Garbage Collection.
+    private final List<engine.graphics.ProjectedTriangle> renderBuffer = new ArrayList<>();
+    private int bufferCount = 0;
 
     public Renderer(Screen screen) {
         this.screen = screen;
         // Initialize Projection Matrix (90 FOV, Aspect Ratio, Near 0.1, Far 1000.0)
         this.projectionMatrix = Matrix4x4.makeProjection(90.0, (double)screen.getHeight() / screen.getWidth(), 0.1, 1000.0);
+        
+        // Initialize Thread Pool
+        this.NUM_THREADS = Runtime.getRuntime().availableProcessors();
+        this.threadPool = Executors.newFixedThreadPool(NUM_THREADS);
+        System.out.println("Renderer initialized with " + NUM_THREADS + " threads.");
+        
+        // Pre-warm the buffer with some triangles to reduce initial allocation stutter
+        for (int i = 0; i < 10000; i++) {
+            renderBuffer.add(new engine.graphics.ProjectedTriangle());
+        }
     }
 
     public void updateProjection(int width, int height) {
@@ -75,10 +104,74 @@ public class Renderer {
         // Deep Sky Blue to Horizon Light Blue
         screen.drawSky(0x000033, 0x87CEEB); 
         screen.clearZBuffer(); // Reset Depth
+        
+        // Reset the render queue counter (logically clear the list without deleting objects)
+        bufferCount = 0;
+    }
+    
+    /**
+     * Rasters all buffered triangles to the screen using Dynamic Tile-Based Multi-Threading.
+     */
+    public void draw() {
+        int screenWidth = screen.getWidth();
+        int screenHeight = screen.getHeight();
+        
+        // Calculate grid dimensions
+        int tilesX = (screenWidth + TILE_SIZE - 1) / TILE_SIZE; // Ceiling division
+        int tilesY = (screenHeight + TILE_SIZE - 1) / TILE_SIZE;
+        int totalTiles = tilesX * tilesY;
+        
+        // Atomic counter for work stealing
+        // Threads will race to grab the next available tile index
+        AtomicInteger nextTileIndex = new AtomicInteger(0);
+        
+        CountDownLatch latch = new CountDownLatch(NUM_THREADS);
+
+        for (int i = 0; i < NUM_THREADS; i++) {
+            threadPool.submit(() -> {
+                try {
+                    int tileIdx;
+                    // Keep grabbing tiles until none are left
+                    while ((tileIdx = nextTileIndex.getAndIncrement()) < totalTiles) {
+                        
+                        // Convert 1D tile index to 2D coordinates
+                        int ty = tileIdx / tilesX;
+                        int tx = tileIdx % tilesX;
+                        
+                        int minX = tx * TILE_SIZE;
+                        int minY = ty * TILE_SIZE;
+                        int maxX = Math.min(minX + TILE_SIZE, screenWidth);
+                        int maxY = Math.min(minY + TILE_SIZE, screenHeight);
+                        
+                        // Render all buffer triangles into this small tile
+                        // Note: Bounding Box checks inside fillTriangle make this fast
+                        for (int tIdx = 0; tIdx < bufferCount; tIdx++) {
+                            engine.graphics.ProjectedTriangle t = renderBuffer.get(tIdx);
+                            screen.fillTriangle(
+                                t.x1, t.y1, t.z1, t.l1,
+                                t.x2, t.y2, t.z2, t.l2,
+                                t.x3, t.y3, t.z3, t.l3,
+                                t.color,
+                                minX, maxX, minY, maxY
+                            );
+                        }
+                    }
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        try {
+            // Wait for all threads to finish before flipping the buffer
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
-     * Processes a mesh: Transforms, Clips, Lights, Projects, and Draws directly to Screen.
+     * Processes a mesh: Transforms, Clips, Lights, Projects, and Buffers it.
      */
     public void renderMesh(Mesh mesh, Camera camera) {
         // --- PREPARE MATRICES ---
@@ -202,13 +295,18 @@ public class Renderer {
                         triProjected.lighting[i] = clipped.lighting[i];
                     }
 
-                    // 7. RASTERIZE
-                    screen.fillTriangle(
-                        (int)triProjected.v[0].x, (int)triProjected.v[0].y, triProjected.v[0].z, triProjected.lighting[0],
-                        (int)triProjected.v[1].x, (int)triProjected.v[1].y, triProjected.v[1].z, triProjected.lighting[1],
-                        (int)triProjected.v[2].x, (int)triProjected.v[2].y, triProjected.v[2].z, triProjected.lighting[2],
-                        finalColor
-                    );
+                    // 7. BUFFER (Do not draw yet)
+                    // Get a reusable object from the pool
+                    if (bufferCount >= renderBuffer.size()) {
+                        renderBuffer.add(new engine.graphics.ProjectedTriangle());
+                    }
+                    engine.graphics.ProjectedTriangle t = renderBuffer.get(bufferCount++);
+                    
+                    // Copy data (Primitive copy is fast)
+                    t.x1 = (int)triProjected.v[0].x; t.y1 = (int)triProjected.v[0].y; t.z1 = triProjected.v[0].z; t.l1 = triProjected.lighting[0];
+                    t.x2 = (int)triProjected.v[1].x; t.y2 = (int)triProjected.v[1].y; t.z2 = triProjected.v[1].z; t.l2 = triProjected.lighting[1];
+                    t.x3 = (int)triProjected.v[2].x; t.y3 = (int)triProjected.v[2].y; t.z3 = triProjected.v[2].z; t.l3 = triProjected.lighting[2];
+                    t.color = finalColor;
                 }
             }
         }
