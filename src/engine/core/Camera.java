@@ -8,7 +8,7 @@ import engine.math.Vector3D;
  * Handles position (x,y,z) and orientation (pitch, yaw).
  * Implements First-Person Shooter (FPS) style movement logic where movement
  * is relative to the camera's current yaw (rotation around the Y-axis).
- * </p>2
+ * </p>
  */
 public class Camera {
     /** World space position of the camera */
@@ -95,5 +95,19 @@ public class Camera {
      */
     public void moveDown(double speed) {
         position.y += speed;
+    }
+    
+    /**
+     * Calculates the vector pointing "Forward" from the camera.
+     * Used for culling (checking what is in front of the camera).
+     * @return Normalized direction vector.
+     */
+    public Vector3D getForward() {
+        // Based on the WASD movement math:
+        // x = -sin(yaw)
+        // z = cos(yaw)
+        // Note: This is a 2D forward (on the ground plane), which is sufficient for simple terrain culling.
+        // For full 3D culling (including looking up/down), we would include pitch.
+        return new Vector3D(-Math.sin(yaw), 0, Math.cos(yaw)).normalize();
     }
 }

@@ -10,7 +10,10 @@ import engine.math.Vector3D;
  * Encapsulates mesh generation and height queries for physics.
  */
 public class Terrain {
-    public Mesh mesh;
+    // We now split the world into multiple smaller meshes ("Chunks").
+    // This allows the renderer to skip drawing chunks that are behind the player.
+    public List<Mesh> chunks = new ArrayList<>();
+    
     private final PerlinNoise noise;
     private final double scale;
     private final int width;
@@ -19,13 +22,17 @@ public class Terrain {
     // Config for terrain shape
     private static final double NOISE_FREQUENCY = 0.1;
     private static final double HEIGHT_AMPLITUDE = 10.0;
+    
+    // Chunk size (e.g., 10x10 squares per chunk)
+    private static final int CHUNK_SIZE = 10;
 
     public Terrain(int width, int depth, double scale, long seed) {
         this.width = width;
         this.depth = depth;
         this.scale = scale;
         this.noise = new PerlinNoise(seed);
-        this.mesh = generateMesh();
+        
+        generateChunks();
     }
 
     /**
@@ -56,51 +63,65 @@ public class Terrain {
         return y;
     }
 
-    private Mesh generateMesh() {
-        Mesh mesh = new Mesh();
-        
-        for (int x = 0; x < width; x++) {
-            for (int z = 0; z < depth; z++) {
-                // Calculate position of the current square's corners
-                double x0 = (x - width/2.0) * scale;
-                double z0 = (z - depth/2.0) * scale;
+    private void generateChunks() {
+        // Loop through the grid in steps of CHUNK_SIZE
+        for (int startX = 0; startX < width; startX += CHUNK_SIZE) {
+            for (int startZ = 0; startZ < depth; startZ += CHUNK_SIZE) {
                 
-                double x1 = (x + 1 - width/2.0) * scale;
-                double z1 = (z + 1 - depth/2.0) * scale;
+                Mesh chunk = new Mesh();
                 
-                // Get Heights
-                double y00 = noise.noise(x * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-                double y01 = noise.noise(x * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-                double y10 = noise.noise((x+1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-                double y11 = noise.noise((x+1) * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+                // Process the squares INSIDE this chunk
+                // Ensure we don't go out of bounds (Math.min)
+                int endX = Math.min(startX + CHUNK_SIZE, width);
+                int endZ = Math.min(startZ + CHUNK_SIZE, depth);
                 
-                // Coloring Logic
-                int color;
-                if (y00 < 0.0) {
-                    color = 0x2E8B57; // Sea Green
-                } else if (y00 < 4.0) {
-                    color = 0x8B4513; // Saddle Brown
-                } else {
-                    color = 0xFFFFFF; // Snow
-                }
+                for (int x = startX; x < endX; x++) {
+                    for (int z = startZ; z < endZ; z++) {
+                        // Calculate position of the current square's corners
+                        double x0 = (x - width/2.0) * scale;
+                        double z0 = (z - depth/2.0) * scale;
+                        
+                        double x1 = (x + 1 - width/2.0) * scale;
+                        double z1 = (z + 1 - depth/2.0) * scale;
+                        
+                        // Get Heights
+                        double y00 = noise.noise(x * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+                        double y01 = noise.noise(x * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+                        double y10 = noise.noise((x+1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+                        double y11 = noise.noise((x+1) * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+                        
+                        // Coloring Logic
+                        int color;
+                        if (y00 < 0.0) {
+                            color = 0x2E8B57; // Sea Green
+                        } else if (y00 < 4.0) {
+                            color = 0x8B4513; // Saddle Brown
+                        } else {
+                            color = 0xFFFFFF; // Snow
+                        }
 
-                // Triangle 1
-                mesh.triangles.add(new Triangle(
-                    new Vector3D(x0, y00, z0),
-                    new Vector3D(x1, y11, z1),
-                    new Vector3D(x0, y01, z1),
-                    color
-                ));
+                        // Triangle 1
+                        chunk.triangles.add(new Triangle(
+                            new Vector3D(x0, y00, z0),
+                            new Vector3D(x1, y11, z1),
+                            new Vector3D(x0, y01, z1),
+                            color
+                        ));
+                        
+                        // Triangle 2
+                        chunk.triangles.add(new Triangle(
+                            new Vector3D(x0, y00, z0),
+                            new Vector3D(x1, y10, z0),
+                            new Vector3D(x1, y11, z1),
+                            color
+                        ));
+                    }
+                }
                 
-                // Triangle 2
-                mesh.triangles.add(new Triangle(
-                    new Vector3D(x0, y00, z0),
-                    new Vector3D(x1, y10, z0),
-                    new Vector3D(x1, y11, z1),
-                    color
-                ));
+                // Important: Calculate the bounding sphere for this chunk!
+                chunk.recalculateBounds();
+                chunks.add(chunk);
             }
         }
-        return mesh;
     }
 }

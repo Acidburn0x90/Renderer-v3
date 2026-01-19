@@ -76,6 +76,26 @@ public class Renderer {
      * Processes a mesh: Transforms, Clips, Lights, Projects, and Draws directly to Screen.
      */
     public void renderMesh(Mesh mesh, Camera camera) {
+        // --- 0. FRUSTUM CULLING (Optimization) ---
+        // Check if the entire mesh is behind the camera.
+        
+        // Vector from Camera to Mesh Center
+        // V = Center - CamPos
+        Vector3D toMesh = mesh.center.subtract(camera.position);
+        
+        // Get Camera Forward Vector (Look Direction)
+        Vector3D forward = camera.getForward();
+        
+        // Project the mesh center onto the forward vector (Dot Product)
+        // Distance = how far "in front" of the camera the mesh center is.
+        double distanceAlongForward = toMesh.dotProduct(forward);
+        
+        // If the center is "behind" the camera plane by more than its radius, it is invisible.
+        // We use -radius because the sphere might overlap the plane even if the center is behind.
+        if (distanceAlongForward < -mesh.radius) {
+            return; // Skip drawing this entire mesh!
+        }
+
         // Create Rotation Matrices based on Camera Orientation
         Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
         Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);

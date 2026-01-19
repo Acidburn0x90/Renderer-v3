@@ -75,181 +75,384 @@ public class DemoGame extends Engine {
     
             
     
-            // --- 1. Generate Terrain ---
-    
-            // We create a Terrain object which serves two purposes:
-    
-            // A) It generates the visual Mesh (triangles) for the renderer.
-    
-            // B) It holds the math (Perlin Noise) allows us to query ground height at any (x,z) for physics.
-    
-            // Parameters: 100x100 grid (Stress Test), Scale 2.0.
-    
-            terrain = new Terrain(100, 100, 2.0, System.currentTimeMillis());
-    
-            meshes.add(terrain.mesh);
-    
-        }
-    
-    
-    
-        /**
-    
-         * Called 60 times per second.
-    
-         * Handles keyboard and mouse input to move the camera.
-    
-         */
-    
-        @Override
-    
-        public void update() {
-    
-            // --- Toggles ---
-    
-            // Toggle 'Walking Mode' when G is pressed.
-    
-            if (input.isKey(KeyEvent.VK_G)) {
-    
-                 walkingMode = !walkingMode;
-    
-                 // Small debounce hack: normally you'd handle "OnPress" events separately
-    
-                 try { Thread.sleep(200); } catch (Exception e) {}
-    
-            }
-    
-        
-    
-            // --- Keyboard Movement ---
-    
-            double speed = 0.1;
-    
-            if (input.isKey(KeyEvent.VK_SHIFT)) speed = 0.3; // Sprint
-    
-    
-    
-            // WASD Movement (Relative to Camera Rotation)
-    
-            if (input.isKey(KeyEvent.VK_W)) camera.moveForward(speed);
-    
-            if (input.isKey(KeyEvent.VK_S)) camera.moveBackward(speed);
-    
-            if (input.isKey(KeyEvent.VK_A)) camera.moveLeft(speed);
-    
-            if (input.isKey(KeyEvent.VK_D)) camera.moveRight(speed);
+                    // --- 1. Generate Terrain ---
     
             
     
-            // Vertical Movement (Global Axis)
-    
-            // Only allow flying if we are NOT in walking mode.
-    
-            if (!walkingMode) {
-    
-                if (input.isKey(KeyEvent.VK_SPACE)) camera.moveUp(speed);
-    
-                if (input.isKey(KeyEvent.VK_CONTROL)) camera.moveDown(speed);
-    
-            }
-    
-    
-    
-            // --- Mouse Look ---
-    
-            // We get the raw delta (change) in mouse position from the Input system.
-    
-            // This is enabled by the "Mouse Lock" logic in the Engine class.
-    
-            double sensitivity = 0.005;
-    
-            double dx = input.getDeltaX();
-    
-            double dy = input.getDeltaY();
-    
-    
-    
-            if (dx != 0 || dy != 0) {
-    
-                camera.rotate(-dy * sensitivity, -dx * sensitivity);
-    
-            }
+                    // We create a Terrain object which serves two purposes:
     
             
     
-            // --- Physics / Walking Logic ---
+                    // A) It generates the visual Mesh (triangles) for the renderer.
     
-            if (walkingMode) {
+            
     
-                // 1. Query the Terrain for the exact ground height at our current (x, z) position.
+                    // B) It holds the math (Perlin Noise) allows us to query ground height at any (x,z) for physics.
     
-                double terrainHeight = terrain.getHeight(camera.position.x, camera.position.z);
+            
+    
+                    // Parameters: 100x100 grid (Stress Test), Scale 2.0.
+    
+            
+    
+                    terrain = new Terrain(100, 100, 2.0, System.currentTimeMillis());
+    
+            
+    
+                    
+    
+            
+    
+                    // Add all the chunks to our render list
+    
+            
+    
+                    meshes.addAll(terrain.chunks);
+    
+            
+    
+                }
+    
+            
+    
+            
+    
+            
+    
+                /**
+    
+            
+    
+                 * Called 60 times per second.
+    
+            
+    
+                 * Handles keyboard and mouse input to move the camera.
+    
+            
+    
+                 */
+    
+            
+    
+                @Override
+    
+            
+    
+                public void update() {
+    
+            
+    
+                    // --- Toggles ---
+    
+            
+    
+                    // Toggle 'Walking Mode' when G is pressed.
+    
+            
+    
+                    if (input.isKey(KeyEvent.VK_G)) {
+    
+            
+    
+                         walkingMode = !walkingMode;
+    
+            
+    
+                         // Small debounce hack: normally you'd handle "OnPress" events separately
+    
+            
+    
+                         try { Thread.sleep(200); } catch (Exception e) {}
+    
+            
+    
+                    }
+    
+            
     
                 
     
-                // 2. Snap the camera to that height.
+            
     
-                // Note on Coordinates: In this engine, Y is inverted (like 2D screen coordinates).
-    
-                // Negative Y is UP, Positive Y is DOWN.
-    
-                // If the ground is at Y=10, standing "on top" of it means being at Y=8 (2 units 'up').
-    
-                camera.position.y = terrainHeight - 2.0;
-    
-            }
-    
-        }
-    
-    
-    
-        /**
-    
-         * Called as fast as possible.
-    
-         * Sends the meshes to the renderer.
-    
-         */
-    
-        @Override
-    
-        public void render() {
-    
-            renderer.beginFrame();
+                    // --- Keyboard Movement ---
     
             
     
-            for (Mesh mesh : meshes) {
-    
-                renderer.renderMesh(mesh, camera);
-    
-            }
-    
-            // endFrame() is no longer needed as triangles are drawn immediately
+                    double speed = 0.1;
     
             
     
-            // --- FPS Counter ---
+                    if (input.isKey(KeyEvent.VK_SHIFT)) speed = 0.3; // Sprint
     
-            frames++;
+            
     
-            if (System.currentTimeMillis() - timer > 1000) {
+            
     
-                timer += 1000;
+            
     
-                fps = frames;
+                    // WASD Movement (Relative to Camera Rotation)
     
-                frames = 0;
+            
     
-                System.out.println("FPS: " + fps); // Keep console log as backup
+                    if (input.isKey(KeyEvent.VK_W)) camera.moveForward(speed);
+    
+            
+    
+                    if (input.isKey(KeyEvent.VK_S)) camera.moveBackward(speed);
+    
+            
+    
+                    if (input.isKey(KeyEvent.VK_A)) camera.moveLeft(speed);
+    
+            
+    
+                    if (input.isKey(KeyEvent.VK_D)) camera.moveRight(speed);
+    
+            
+    
+                    
+    
+            
+    
+                    // Vertical Movement (Global Axis)
+    
+            
+    
+                    // Only allow flying if we are NOT in walking mode.
+    
+            
+    
+                    if (!walkingMode) {
+    
+            
+    
+                        if (input.isKey(KeyEvent.VK_SPACE)) camera.moveUp(speed);
+    
+            
+    
+                        if (input.isKey(KeyEvent.VK_CONTROL)) camera.moveDown(speed);
+    
+            
+    
+                    }
+    
+            
+    
+            
+    
+            
+    
+                    // --- Mouse Look ---
+    
+            
+    
+                    // We get the raw delta (change) in mouse position from the Input system.
+    
+            
+    
+                    // This is enabled by the "Mouse Lock" logic in the Engine class.
+    
+            
+    
+                    double sensitivity = 0.005;
+    
+            
+    
+                    double dx = input.getDeltaX();
+    
+            
+    
+                    double dy = input.getDeltaY();
+    
+            
+    
+            
+    
+            
+    
+                    if (dx != 0 || dy != 0) {
+    
+            
+    
+                        camera.rotate(-dy * sensitivity, -dx * sensitivity);
+    
+            
+    
+                    }
+    
+            
+    
+                    
+    
+            
+    
+                    // --- Physics / Walking Logic ---
+    
+            
+    
+                    if (walkingMode) {
+    
+            
+    
+                        // 1. Query the Terrain for the exact ground height at our current (x, z) position.
+    
+            
+    
+                        double terrainHeight = terrain.getHeight(camera.position.x, camera.position.z);
+    
+            
+    
+                        
+    
+            
+    
+                        // 2. Snap the camera to that height.
+    
+            
+    
+                        // Note on Coordinates: In this engine, Y is inverted (like 2D screen coordinates).
+    
+            
+    
+                        // Negative Y is UP, Positive Y is DOWN.
+    
+            
+    
+                        // If the ground is at Y=10, standing "on top" of it means being at Y=8 (2 units 'up').
+    
+            
+    
+                        camera.position.y = terrainHeight - 2.0;
+    
+            
+    
+                    }
+    
+            
+    
+                }
+    
+            
+    
+            
+    
+            
+    
+                /**
+    
+            
+    
+                 * Called as fast as possible.
+    
+            
+    
+                 * Sends the meshes to the renderer.
+    
+            
+    
+                 */
+    
+            
+    
+                @Override
+    
+            
+    
+                public void render() {
+    
+            
+    
+                    renderer.beginFrame();
+    
+            
+    
+                    
+    
+            
+    
+                    for (Mesh mesh : meshes) {
+    
+            
+    
+                        renderer.renderMesh(mesh, camera);
+    
+            
+    
+                    }
+    
+            
+    
+                    // endFrame() is no longer needed as triangles are drawn immediately
+    
+            
+    
+                    
+    
+            
+    
+                    // --- FPS Counter ---
+    
+            
+    
+                    frames++;
+    
+            
+    
+                    if (System.currentTimeMillis() - timer > 1000) {
+    
+            
+    
+                        timer += 1000;
+    
+            
+    
+                        fps = frames;
+    
+            
+    
+                        frames = 0;
+    
+            
+    
+                        System.out.println("FPS: " + fps); // Keep console log as backup
+    
+            
+    
+                    }
+    
+            
+    
+                    screen.drawText("FPS: " + fps, 10, 20, 0xFFFF00); // Yellow Text
+    
+            
+    
+                    
+    
+            
+    
+                    // Count total triangles in the scene (Static count)
+    
+            
+    
+                    int totalTris = 0;
+    
+            
+    
+                    for (Mesh m : meshes) totalTris += m.triangles.size();
+    
+            
+    
+                    
+    
+            
+    
+                    screen.drawText("Triangles: " + totalTris, 10, 40, 0xFFFFFF);
+    
+            
+    
+                }
+    
+            
     
             }
-    
-            screen.drawText("FPS: " + fps, 10, 20, 0xFFFF00); // Yellow Text
-    
-            screen.drawText("Triangles: " + (terrain.mesh.triangles.size()), 10, 40, 0xFFFFFF);
-    
-        }
-    
-    
-}
