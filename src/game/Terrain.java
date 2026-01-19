@@ -22,49 +22,54 @@ public class Terrain {
     private final int width;
     private final int depth;
 
-    // Config for terrain shape
-    private static final double NOISE_FREQUENCY = 0.1;
-    private static final double HEIGHT_AMPLITUDE = 10.0;
+        // Config for terrain shape
+        // "Epic Scale" settings: Lower frequency = Wider hills. Higher amplitude = Taller mountains.
+        private static final double NOISE_FREQUENCY = 0.02;
+        private static final double HEIGHT_AMPLITUDE = 30.0;
+        
+        // Chunk size (e.g., 10x10 squares per chunk)
+        private static final int CHUNK_SIZE = 10;
     
-    // Chunk size (e.g., 10x10 squares per chunk)
-    private static final int CHUNK_SIZE = 10;
-
-    public Terrain(int width, int depth, double scale, long seed) {
-        this.width = width;
-        this.depth = depth;
-        this.scale = scale;
-        this.noise = new PerlinNoise(seed);
+        public Terrain(int width, int depth, double scale, long seed) {
+            this.width = width;
+            this.depth = depth;
+            this.scale = scale;
+            this.noise = new PerlinNoise(seed);
+            
+            generateChunks();
+        }
         
-        generateChunks();
-    }
-
-    /**
-     * Samples the fractal noise at a given grid coordinate.
-     * This combines multiple "octaves" of noise to create realistic terrain.
-     */
-    private double sampleHeight(double x, double z) {
-        double total = 0;
-        double frequency = NOISE_FREQUENCY;
-        double amplitude = HEIGHT_AMPLITUDE;
-        double persistence = 0.5; // How much each octave contributes
-        double lacunarity = 2.0;   // How much frequency increases per octave
-        
-        // Layer 1: Big Mountains
-        total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
-        
-        // Layer 2: Smaller Hills
-        frequency *= lacunarity;
-        amplitude *= persistence;
-        total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
-        
-        // Layer 3: Surface Roughness/Rocks
-        frequency *= lacunarity;
-        amplitude *= persistence;
-        total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
-        
-        return total;
-    }
-
+        /**
+         * Samples the fractal noise at a given grid coordinate.
+         * This combines multiple "octaves" of noise to create realistic terrain.
+         */
+        private double sampleHeight(double x, double z) {
+            double total = 0;
+            double frequency = NOISE_FREQUENCY;
+            double amplitude = HEIGHT_AMPLITUDE;
+            double persistence = 0.45; // Slightly lower persistence so small details don't overpower the shape
+            double lacunarity = 2.1;   // How much frequency increases per octave
+            
+            // Layer 1: Big Mountains
+            total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+            
+            // Layer 2: Smaller Hills
+            frequency *= lacunarity;
+            amplitude *= persistence;
+            total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+            
+            // Layer 3: Surface Roughness/Rocks
+            frequency *= lacunarity;
+            amplitude *= persistence;
+            total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+            
+            // Layer 4: Fine Detail (Extra grit)
+            frequency *= lacunarity;
+            amplitude *= persistence;
+            total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+            
+            return total;
+        }
     /**
      * Calculates the terrain height at a specific world coordinate.
      */

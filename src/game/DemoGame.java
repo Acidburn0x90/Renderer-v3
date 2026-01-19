@@ -76,39 +76,43 @@ public class DemoGame extends Engine {
     
             
     
-                    // --- 1. Generate Terrain ---
+                            // --- 1. Generate Terrain ---
     
             
     
-                    // We create a Terrain object which serves two purposes:
+                            // We create a Terrain object which serves two purposes:
     
             
     
-                    // A) It generates the visual Mesh (triangles) for the renderer.
+                            // A) It generates the visual Mesh (triangles) for the renderer.
     
             
     
-                    // B) It holds the math (Perlin Noise) allows us to query ground height at any (x,z) for physics.
+                            // B) It holds the math (Perlin Noise) allows us to query ground height at any (x,z) for physics.
     
             
     
-                    // Parameters: 100x100 grid (Stress Test), Scale 2.0.
+                            // Parameters: 200x200 grid (Epic Scale), Scale 2.0.
     
             
     
-                    terrain = new Terrain(100, 100, 2.0, System.currentTimeMillis());
+                            // This creates a 400x400 unit world.
     
             
     
-                    
+                            terrain = new Terrain(200, 200, 2.0, System.currentTimeMillis());
     
             
     
-                    // Add all the chunks to our render list
+                            
     
             
     
-                    meshes.addAll(terrain.chunks);
+                            // Add all the chunks to our render list
+    
+            
+    
+                            meshes.addAll(terrain.chunks);
     
             
     
@@ -176,23 +180,55 @@ public class DemoGame extends Engine {
     
             
     
-                    // --- Keyboard Movement ---
+                        // --- Keyboard Movement ---
     
             
     
-                    double speed = 0.1;
-                    boolean isMoving = false;
-            
-    
-                    if (input.isKey(KeyEvent.VK_SHIFT)) speed = 0.3; // Sprint
+                
     
             
     
-            
+                        double speed = 0.4; // Faster base speed for larger world
     
             
     
-                    // WASD Movement (Relative to Camera Rotation)
+                
+    
+            
+    
+                        boolean isMoving = false;
+    
+            
+    
+                
+    
+            
+    
+                        
+    
+            
+    
+                
+    
+            
+    
+                        if (input.isKey(KeyEvent.VK_SHIFT)) speed = 1.0; // Faster sprint
+    
+            
+    
+                
+    
+            
+    
+                    
+    
+            
+    
+                
+    
+            
+    
+                        // WASD Movement (Relative to Camera Rotation)
     
             
     
