@@ -14,6 +14,22 @@ public class Vector3D {
         this.y = y;
         this.z = z;
     }
+    
+    // --- Setters (In-Place) ---
+    
+    public void set(double x, double y, double z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+    
+    public void set(Vector3D other) {
+        this.x = other.x;
+        this.y = other.y;
+        this.z = other.z;
+    }
+
+    // --- Immutable Math (Returns New Object) ---
 
     /**
      * Subtracts another vector from this one.
@@ -40,6 +56,27 @@ public class Vector3D {
      */
     public Vector3D multiply(double scalar) {
         return new Vector3D(x * scalar, y * scalar, z * scalar);
+    }
+
+    // --- Mutable Math (Modifies This Object) ---
+    // These are crucial for the "Zero-Allocation" optimization strategy.
+
+    public void subtractInPlace(Vector3D v) {
+        this.x -= v.x;
+        this.y -= v.y;
+        this.z -= v.z;
+    }
+    
+    public void addInPlace(Vector3D v) {
+        this.x += v.x;
+        this.y += v.y;
+        this.z += v.z;
+    }
+    
+    public void multiplyInPlace(double scalar) {
+        this.x *= scalar;
+        this.y *= scalar;
+        this.z *= scalar;
     }
 
     /**

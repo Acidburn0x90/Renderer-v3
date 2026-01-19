@@ -32,8 +32,23 @@ public class Renderer {
     private final Screen screen;
     private Matrix4x4 projectionMatrix;
     
-    // NOTE: We no longer need 'trianglesToRaster' because Z-Buffering allows us to draw 
-    // triangles immediately in any order!
+    // --- CACHE ---
+    // Reusable objects to prevent Garbage Collection spikes.
+    // We only need one instance of these, we keep overwriting them.
+    private final Triangle triTranslated = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+    private final Triangle triRotatedYaw = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+    private final Triangle triView = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+    private final Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+    
+    // Helper vectors for math
+    private final Vector3D vLine1 = new Vector3D(0,0,0);
+    private final Vector3D vLine2 = new Vector3D(0,0,0);
+    private final Vector3D vNormal = new Vector3D(0,0,0);
+    private final Vector3D vCameraRay = new Vector3D(0,0,0);
+    
+    // Clipping planes are static/constant for now
+    private final Vector3D planePoint = new Vector3D(0, 0, 0.1);
+    private final Vector3D planeNormal = new Vector3D(0, 0, 1);
 
     public Renderer(Screen screen) {
         this.screen = screen;
@@ -69,50 +84,52 @@ public class Renderer {
         viewLightDir = matRotX.multiplyVector(viewLightDir);
 
         for (Triangle tri : mesh.triangles) {
-            // Temporary triangles for pipeline stages
-            Triangle triTranslated = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
-            triTranslated.color = tri.color;
             
-            Triangle triRotatedYaw = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
-            triRotatedYaw.color = tri.color;
-            
-            Triangle triView = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
-            triView.color = tri.color;
-
             // 1. TRANSLATION (View Space)
+            // Move vertices relative to camera
             for (int i = 0; i < 3; i++) {
-                triTranslated.v[i] = new Vector3D(
-                    tri.v[i].x - camera.position.x,
-                    tri.v[i].y - camera.position.y,
-                    tri.v[i].z - camera.position.z
-                );
+                triTranslated.v[i].set(tri.v[i]);
+                triTranslated.v[i].subtractInPlace(camera.position);
             }
 
             // 2. ROTATION (View Space)
+            // Apply Camera Rotations
             for (int i = 0; i < 3; i++) {
-                triRotatedYaw.v[i] = matRotY.multiplyVector(triTranslated.v[i]);
-                triView.v[i] = matRotX.multiplyVector(triRotatedYaw.v[i]);
+                matRotY.multiplyVector(triTranslated.v[i], triRotatedYaw.v[i]);
+                matRotX.multiplyVector(triRotatedYaw.v[i], triView.v[i]);
             }
+            triView.color = tri.color;
 
             // 3. CLIP (Near Plane)
-            List<Triangle> clippedTriangles = clipTriangleAgainstPlane(
-                new Vector3D(0, 0, 0.1), // Plane Point
-                new Vector3D(0, 0, 1),   // Plane Normal
-                triView
-            );
+            // This creates new triangles ONLY if clipping happens.
+            // This is acceptable overhead compared to per-frame allocation for everything.
+            List<Triangle> clippedTriangles = clipTriangleAgainstPlane(planePoint, planeNormal, triView);
 
             for (Triangle clipped : clippedTriangles) {
                 // 4. CULL (Backface Culling)
-                Vector3D line1 = clipped.v[1].subtract(clipped.v[0]);
-                Vector3D line2 = clipped.v[2].subtract(clipped.v[0]);
-                Vector3D normal = line1.crossProduct(line2).normalize();
+                // Calculate Normal: (v1-v0) x (v2-v0)
+                vLine1.set(clipped.v[1]); vLine1.subtractInPlace(clipped.v[0]);
+                vLine2.set(clipped.v[2]); vLine2.subtractInPlace(clipped.v[0]);
                 
-                Vector3D cameraRay = clipped.v[0].subtract(new Vector3D(0,0,0));
+                // Cross Product
+                vNormal.set(
+                    vLine1.y * vLine2.z - vLine1.z * vLine2.y,
+                    vLine1.z * vLine2.x - vLine1.x * vLine2.z,
+                    vLine1.x * vLine2.y - vLine1.y * vLine2.x
+                );
+                
+                double len = vNormal.length();
+                if (len == 0) continue;
+                vNormal.multiplyInPlace(1.0 / len); // Normalize
 
-                if (normal.dotProduct(cameraRay) < 0.0f) {
+                // Vector from Camera to Triangle (Approximate as v0 since cam is at 0,0,0)
+                // v0 - 0 = v0
+                vCameraRay.set(clipped.v[0]);
+
+                if (vNormal.dotProduct(vCameraRay) < 0.0f) {
                     
                     // 5. LIGHTING
-                    double dp = normal.dotProduct(viewLightDir);
+                    double dp = vNormal.dotProduct(viewLightDir);
                     double brightness = Math.max(0.4, dp); 
                     
                     int baseColor = clipped.color;
@@ -125,20 +142,15 @@ public class Renderer {
                     int finalColor = (r << 16) | (g << 8) | b;
 
                     // 6. PROJECT & DRAW
-                    Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
-
-                    // Project all 3 vertices
                     for (int i = 0; i < 3; i++) {
-                        // Project: 3D -> 2D
-                        triProjected.v[i] = projectionMatrix.multiplyVector(clipped.v[i]);
+                        projectionMatrix.multiplyVector(clipped.v[i], triProjected.v[i]);
                         
-                        // Scale to Screen Coordinates
+                        // Scale to Screen
                         triProjected.v[i].x = (triProjected.v[i].x + 1.0) * 0.5 * screen.getWidth();
                         triProjected.v[i].y = (triProjected.v[i].y + 1.0) * 0.5 * screen.getHeight();
-                        // Z is now in projected space (0.0 to 1.0 usually), which is perfect for Z-Buffer
                     }
 
-                    // 7. RASTERIZE (Scanline with Z-Buffer)
+                    // 7. RASTERIZE
                     screen.fillTriangle(
                         (int)triProjected.v[0].x, (int)triProjected.v[0].y, triProjected.v[0].z,
                         (int)triProjected.v[1].x, (int)triProjected.v[1].y, triProjected.v[1].z,

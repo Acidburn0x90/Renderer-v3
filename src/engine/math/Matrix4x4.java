@@ -27,22 +27,32 @@ public class Matrix4x4 {
      * @return A new Vector3D representing the transformed point.
      */
     public Vector3D multiplyVector(Vector3D i) {
-        // Standard Matrix * Vector multiplication
-        double x = i.x * m[0][0] + i.y * m[1][0] + i.z * m[2][0] + m[3][0];
-        double y = i.x * m[0][1] + i.y * m[1][1] + i.z * m[2][1] + m[3][1];
-        double z = i.x * m[0][2] + i.y * m[1][2] + i.z * m[2][2] + m[3][2];
-        double w = i.x * m[0][3] + i.y * m[1][3] + i.z * m[2][3] + m[3][3];
+        Vector3D out = new Vector3D(0,0,0);
+        multiplyVector(i, out);
+        return out;
+    }
 
-        // Perspective Division (Normalizing to Cartesian coordinates)
-        // In projection matrices, 'w' stores the depth info. Dividing by 'w' creates the perspective effect
-        // (distant objects become smaller).
+    /**
+     * Zero-Allocation Matrix Multiplication.
+     * Transforms 'in' and stores the result in 'out'.
+     * @param in Input Vector
+     * @param out Output Vector (Modified in-place)
+     */
+    public void multiplyVector(Vector3D in, Vector3D out) {
+        double x = in.x * m[0][0] + in.y * m[1][0] + in.z * m[2][0] + m[3][0];
+        double y = in.x * m[0][1] + in.y * m[1][1] + in.z * m[2][1] + m[3][1];
+        double z = in.x * m[0][2] + in.y * m[1][2] + in.z * m[2][2] + m[3][2];
+        double w = in.x * m[0][3] + in.y * m[1][3] + in.z * m[2][3] + m[3][3];
+
         if (w != 0.0f) {
-            x /= w;
-            y /= w;
-            z /= w;
+            out.x = x / w;
+            out.y = y / w;
+            out.z = z / w;
+        } else {
+            out.x = x;
+            out.y = y;
+            out.z = z;
         }
-
-        return new Vector3D(x, y, z);
     }
 
     /**
