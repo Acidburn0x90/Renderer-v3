@@ -186,10 +186,41 @@ public class Screen {
     }
 
     /**
-     * Clears the entire screen to black (0).
+     * Resets all pixels in the color buffer to black (0x000000).
      */
     public void clearPixels() {
-        Arrays.fill(pixels, 0); // Fast native array fill
+        for (int i = 0; i < pixels.length; i++) {
+            pixels[i] = 0;
+        }
+    }
+
+    /**
+     * Draws a vertical sky gradient. 
+     * Usually called at the start of a frame instead of clearPixels().
+     * 
+     * @param topColor Hex color for the top of the screen.
+     * @param bottomColor Hex color for the horizon/bottom.
+     */
+    public void drawSky(int topColor, int bottomColor) {
+        int r1 = (topColor >> 16) & 0xFF;
+        int g1 = (topColor >> 8) & 0xFF;
+        int b1 = topColor & 0xFF;
+
+        int r2 = (bottomColor >> 16) & 0xFF;
+        int g2 = (bottomColor >> 8) & 0xFF;
+        int b2 = bottomColor & 0xFF;
+
+        for (int y = 0; y < height; y++) {
+            double alpha = (double) y / height;
+            int r = (int) (r1 + (r2 - r1) * alpha);
+            int g = (int) (g1 + (g2 - g1) * alpha);
+            int b = (int) (b1 + (b2 - b1) * alpha);
+            int color = (r << 16) | (g << 8) | b;
+
+            for (int x = 0; x < width; x++) {
+                pixels[x + y * width] = color;
+            }
+        }
     }
 
     /**

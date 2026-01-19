@@ -68,10 +68,12 @@ public class Renderer {
     }
 
     /**
-     * Clears the screen and resets the Z-Buffer. Call this at the start of render().
+     * Clears the screen with a sky gradient and resets the Z-Buffer. 
+     * Call this at the start of render().
      */
     public void beginFrame() {
-        screen.clearPixels(); // Clear to Black
+        // Deep Sky Blue to Horizon Light Blue
+        screen.drawSky(0x000033, 0x87CEEB); 
         screen.clearZBuffer(); // Reset Depth
     }
 
@@ -90,14 +92,8 @@ public class Renderer {
         Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
         Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);
         
-        // View = Trans * RotY * RotX (Order implies: Move then Rotate around camera origin)
-        // Wait, standard FPS camera is usually: Move World so Camera is at Origin -> Rotate World.
-        // Actually, logic in loop is: 
-        // 1. Translate (v - camPos)
-        // 2. RotY
-        // 3. RotX
-        // This corresponds to V = RotX * RotY * Trans
-        
+        // View = Trans * RotY * RotX (Row Vector Convention: v * M)
+        // This matches the manual loop: v.sub(pos) -> rotY -> rotX
         Matrix4x4 matView = matTrans.multiply(matRotY).multiply(matRotX);
         
         // 2. Build View-Projection Matrix for Culling
@@ -113,7 +109,7 @@ public class Renderer {
         }
 
         // FIXED SUN LIGHTING SETUP (World Space)
-        Vector3D worldLightDir = new Vector3D(0.2, 1.5, -0.5).normalize();
+        Vector3D worldLightDir = new Vector3D(0.5, 1.0, -0.2).normalize();
         
         // Rotate Sun into View Space
         Vector3D viewLightDir = matRotY.multiplyVector(worldLightDir);
@@ -163,9 +159,16 @@ public class Renderer {
 
                 if (vNormal.dotProduct(vCameraRay) < 0.0f) {
                     
-                    // 5. LIGHTING
+                    // 5. LIGHTING (Improved Contrast)
                     double dp = vNormal.dotProduct(viewLightDir);
-                    double brightness = Math.max(0.4, dp); 
+                    
+                    // Ambient + Diffuse (Wrapped lighting for softer shadows)
+                    double ambient = 0.2;
+                    double diffuse = Math.max(0, dp);
+                    double brightness = ambient + (1.0 - ambient) * diffuse;
+                    
+                    // Boost contrast slightly
+                    brightness = Math.pow(brightness, 1.2); 
                     
                     int baseColor = clipped.color;
                     int r = (int)(((baseColor >> 16) & 0xFF) * brightness);
