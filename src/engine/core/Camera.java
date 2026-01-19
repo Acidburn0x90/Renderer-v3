@@ -20,8 +20,50 @@ public class Camera {
     /** Rotation left/right (in radians). */
     public double yaw = 0;   
 
+    // --- Physics ---
+    public double vy = 0; // Vertical Velocity
+    private boolean isGrounded = false;
+    
+    // Physics Constants
+    private static final double GRAVITY = 0.015;
+    private static final double JUMP_FORCE = 0.4;
+    private static final double PLAYER_HEIGHT = 2.0;
+
     public Camera() {
         this.position = new Vector3D(0, 0, 0);
+    }
+    
+    /**
+     * Updates physics (Gravity, Jumping, Collision).
+     * @param terrain The terrain to collide with.
+     * @param jumpRequest True if the player pressed the Jump key this frame.
+     */
+    public void updatePhysics(game.Terrain terrain, boolean jumpRequest) {
+        // 1. Apply Gravity (Remember: +Y is Down in this engine)
+        vy += GRAVITY;
+        
+        // 2. Jump Input
+        if (isGrounded && jumpRequest) {
+            vy = -JUMP_FORCE; // Negative Y is Up
+            isGrounded = false;
+        }
+        
+        // 3. Apply Velocity
+        position.y += vy;
+        
+        // 4. Terrain Collision
+        double groundHeight = terrain.getHeight(position.x, position.z);
+        double feetY = position.y + PLAYER_HEIGHT; // The bottom of the player
+        
+        // If feet are below ground
+        if (feetY > groundHeight) {
+            // Snap to ground
+            position.y = groundHeight - PLAYER_HEIGHT;
+            vy = 0;
+            isGrounded = true;
+        } else {
+            isGrounded = false;
+        }
     }
 
     /**

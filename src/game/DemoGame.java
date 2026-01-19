@@ -287,51 +287,87 @@ public class DemoGame extends Engine {
     
             
     
-                    // --- Physics / Walking Logic ---
+                        // --- Physics / Walking Logic ---
     
             
     
-                    if (walkingMode) {
+                    
     
             
     
-                        // 1. Query the Terrain for the exact ground height at our current (x, z) position.
+                        if (walkingMode) {
     
             
     
-                        double terrainHeight = terrain.getHeight(camera.position.x, camera.position.z);
+                    
     
             
     
-                        
+                            // Apply Physics (Gravity + Jumping + Collision)
     
             
     
-                        // 2. Snap the camera to that height.
+                    
     
             
     
-                        // Note on Coordinates: In this engine, Y is inverted (like 2D screen coordinates).
+                            // We pass the Space key state for jumping
     
             
     
-                        // Negative Y is UP, Positive Y is DOWN.
+                    
     
             
     
-                        // If the ground is at Y=10, standing "on top" of it means being at Y=8 (2 units 'up').
+                            camera.updatePhysics(terrain, input.isKey(KeyEvent.VK_SPACE));
     
             
     
-                        camera.position.y = terrainHeight - 2.0;
+                    
+    
+            
+    
+                        } else {
+    
+            
+    
+                    
+    
+            
+    
+                            // Fly Mode (Original Behavior)
+    
+            
+    
+                    
+    
+            
+    
+                            if (input.isKey(KeyEvent.VK_SPACE)) camera.moveUp(speed);
+    
+            
+    
+                    
+    
+            
+    
+                            if (input.isKey(KeyEvent.VK_CONTROL)) camera.moveDown(speed);
+    
+            
+    
+                    
+    
+            
+    
+                        }
+    
+            
+    
+                    
     
             
     
                     }
-    
-            
-    
-                }
     
             
     
