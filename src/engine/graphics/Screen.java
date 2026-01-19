@@ -204,6 +204,20 @@ public class Screen {
         // Direct array access for maximum performance
         pixels[x + y * width] = color;
     }
+    
+    /**
+     * Draws text onto the screen using Java's standard Graphics2D.
+     * Useful for UI, FPS counters, and debug info.
+     * 
+     * @param text The string to draw.
+     * @param x X coordinate.
+     * @param y Y coordinate.
+     * @param color The text color (hex integer, e.g. 0xFFFFFF).
+     */
+    public void drawText(String text, int x, int y, int color) {
+        g.setColor(new Color(color));
+        g.drawString(text, x, y);
+    }
 
     /**
      * Calculates the linear array index for a 2D coordinate (x, y).
