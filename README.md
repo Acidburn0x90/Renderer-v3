@@ -4,16 +4,17 @@ A professional-grade 3D engine built from scratch in Java without external graph
 
 ## 🌟 Key Features
 
-*   **Software Rasterization**: Implements a pure Java rasterizer using `Graphics2D` and direct pixel array manipulation for high-speed polygon filling.
+*   **Software Rasterization**: Implements a pure Java Z-Buffer Rasterizer (`Scanline Algorithm`) for per-pixel depth testing, handling complex object intersections perfectly.
+*   **Zero-Allocation Architecture**: Heavily optimized to minimize Garbage Collection. Uses Object Pooling and In-Place Math for all per-frame calculations (Vectors, Matrices, Triangles, Clipping).
 *   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).
-*   **Global Sorting**: Implements **Painter's Algorithm** with global triangle sorting to handle depth correctly across multiple objects.
+*   **Clipping**: Implements **Sutherland-Hodgman** clipping to slice triangles against the Near Plane, preventing graphical artifacts.
 *   **Procedural Terrain**: Uses **Perlin Noise** to generate infinite rolling hills.
     *   **Physics Support**: Includes a height-map query system (`Terrain.getHeight`) for collision detection and walking.
 *   **OBJ Model Loading**: Supports loading standard `.obj` 3D models (vertices and faces) from disk.
 *   **Lighting**: Fixed Directional Lighting (Sun) calculated in World Space, rotated into View Space for correct shading relative to the camera. Includes height-based terrain coloring.
 *   **FPS Camera**: Free-look camera with Mouse Locking (infinite rotation) and WASD movement using proper trigonometry.
     *   **Walking Mode**: Gravity simulation that snaps the camera to the terrain surface.
-*   **Performance**: Configurable Render Scale (e.g., render at 12.5% resolution and upscale) to achieve high FPS even on 4K screens.
+*   **Performance**: Optimized to handle thousands of triangles at 60+ FPS on standard hardware.
 
 ## 📂 Project Structure
 
@@ -22,22 +23,27 @@ The engine package contains the reusable core technology, completely decoupled f
 
 *   **`core/Engine.java`**: The abstract base class that manages the **Game Loop** (Fixed Time-Step), Window creation, and Input polling. It uses `Thread.sleep` or high-resolution timers to maintain 60 Updates/Second while rendering as fast as possible.
 *   **`core/Renderer.java`**: The heart of the graphics engine. It handles the entire pipeline:
-    1.  **Transform**: Rotating/Translating vertices.
-    2.  **Clip**: Near-plane clipping to prevent division-by-zero errors behind the camera.
-    3.  **Cull**: Back-face culling using dot products to skip hidden triangles.
-    4.  **Sort**: Sorting visible triangles by depth (Painter's Algorithm).
-    5.  **Light**: Directional lighting calculation.
-    6.  **Rasterize**: Drawing the final triangles to the screen.
+    1.  **Transform**: Rotating/Translating vertices using cached vectors.
+    2.  **Clip**: Slicing triangles against the Near Plane (Z=0.1) using pooled triangle objects.
+    3.  **Cull**: Back-face culling using dot products.
+    4.  **Light**: Directional lighting calculation.
+    5.  **Project**: Converting 3D -> 2D using Matrix math.
+    6.  **Rasterize**: Drawing pixels to the Screen with Z-Buffering.
+*   **`graphics/Screen.java`**: The framebuffer.
+    *   `int[] pixels`: The color buffer.
+    *   `double[] zBuffer`: The depth buffer (Distance to Camera).
+    *   `fillTriangle()`: A custom scanline rasterizer implementation.
 *   **`io/ObjLoader.java`**: A utility to parse `.obj` 3D model files into `Mesh` objects.
 *   **`core/Camera.java`**: Represents the observer. Handles Position (x,y,z) and Rotation (Pitch, Yaw).
-*   **`graphics/Screen.java`**: A wrapper around `BufferedImage`. It accesses the underlying `int[]` pixel array directly for maximum write performance.
-*   **`display/Window.java`**: Manages the OS Window (JFrame) and buffering. It implements **Triple Buffering** via `BufferStrategy` to eliminate screen tearing and flickering.
-*   **`math/*`**: A robust math library built from scratch (`Matrix4x4`, `Vector3D`, `PerlinNoise`).
+*   **`math/*`**: A robust math library optimized for zero-allocation:
+    *   `Matrix4x4`: In-place Matrix multiplication.
+    *   `Vector3D`: In-place Vector arithmetic.
+    *   `PerlinNoise`: Implementation of gradient noise for procedural generation.
 
 ### `src/game` (The Content)
 The game package uses the engine to create a specific experience.
 
-*   **`DemoGame.java`**: The main game implementation. It loads the scene, handles inputs, and toggles walking modes.
+*   **`DemoGame.java`**: The main game implementation. It loads the scene, handles inputs, and toggles walking modes. Includes an **FPS Counter** and Stress Test scene.
 *   **`Terrain.java`**: Encapsulates the procedural generation logic and provides physics height queries for the player.
 
 ### `src/Main.java`

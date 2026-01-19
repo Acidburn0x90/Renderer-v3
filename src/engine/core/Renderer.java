@@ -32,13 +32,17 @@ public class Renderer {
     private final Screen screen;
     private Matrix4x4 projectionMatrix;
     
-    // --- CACHE ---
+    // --- CACHE (Object Pool) ---
     // Reusable objects to prevent Garbage Collection spikes.
-    // We only need one instance of these, we keep overwriting them.
     private final Triangle triTranslated = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
     private final Triangle triRotatedYaw = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
     private final Triangle triView = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
     private final Triangle triProjected = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+    
+    // Clipping Pool
+    private final List<Triangle> clippedTrianglesOut = new ArrayList<>(); // Reusable list
+    private final Triangle triClipped1 = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
+    private final Triangle triClipped2 = new Triangle(new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0));
     
     // Helper vectors for math
     private final Vector3D vLine1 = new Vector3D(0,0,0);
@@ -101,11 +105,10 @@ public class Renderer {
             triView.color = tri.color;
 
             // 3. CLIP (Near Plane)
-            // This creates new triangles ONLY if clipping happens.
-            // This is acceptable overhead compared to per-frame allocation for everything.
-            List<Triangle> clippedTriangles = clipTriangleAgainstPlane(planePoint, planeNormal, triView);
+            // This fills 'clippedTrianglesOut' with 0, 1, or 2 triangles from our pool.
+            clipTriangleAgainstPlane(planePoint, planeNormal, triView);
 
-            for (Triangle clipped : clippedTriangles) {
+            for (Triangle clipped : clippedTrianglesOut) {
                 // 4. CULL (Backface Culling)
                 // Calculate Normal: (v1-v0) x (v2-v0)
                 vLine1.set(clipped.v[1]); vLine1.subtractInPlace(clipped.v[0]);
@@ -165,11 +168,11 @@ public class Renderer {
     // Note: endFrame() is removed as it was only for sorting.
 
     /**
-     * Clips a triangle against a plane.
-     * Returns 0, 1, or 2 triangles.
+     * Clips a triangle against a plane using reusable objects.
+     * populates 'clippedTrianglesOut' with 0, 1, or 2 triangles.
      */
-    private List<Triangle> clipTriangleAgainstPlane(Vector3D planePoint, Vector3D planeNormal, Triangle inTri) {
-        List<Triangle> outTriangles = new ArrayList<>();
+    private void clipTriangleAgainstPlane(Vector3D planePoint, Vector3D planeNormal, Triangle inTri) {
+        clippedTrianglesOut.clear(); // Reset the list
         planeNormal = planeNormal.normalize();
         
         // 1. Calculate distance of each point from the plane
@@ -184,17 +187,13 @@ public class Renderer {
             else outsideCount++;
         }
         
-        if (insideCount == 0) return outTriangles; // All outside
+        if (insideCount == 0) return; // All outside, return empty
         if (insideCount == 3) {
-            outTriangles.add(inTri); // All inside
-            return outTriangles;
+            clippedTrianglesOut.add(inTri); // All inside, return original
+            return;
         }
         
         // 2. Classify and Reorder Vertices
-        // We rotate the vertices so that:
-        // - If 1 point is inside, it is at index 0.
-        // - If 2 points are inside, the ONE outside point is at index 2.
-        
         Vector3D[] v = new Vector3D[]{ inTri.v[0], inTri.v[1], inTri.v[2] };
         double[] d = new double[]{ dist[0], dist[1], dist[2] };
         
@@ -205,12 +204,14 @@ public class Renderer {
                 double td = d[0]; d[0] = d[1]; d[1] = d[2]; d[2] = td;
             }
             
-            // New Triangle: Inside, Intersect(In->Out1), Intersect(In->Out2)
-            Vector3D p1 = v[0];
-            Vector3D p2 = intersectPlane(planePoint, planeNormal, v[0], v[1]);
-            Vector3D p3 = intersectPlane(planePoint, planeNormal, v[0], v[2]);
+            // Re-use triClipped1
+            // Vertices: Inside, Intersect(In->Out1), Intersect(In->Out2)
+            triClipped1.v[0].set(v[0]);
+            intersectPlane(planePoint, planeNormal, v[0], v[1], triClipped1.v[1]);
+            intersectPlane(planePoint, planeNormal, v[0], v[2], triClipped1.v[2]);
+            triClipped1.color = inTri.color;
             
-            outTriangles.add(new Triangle(p1, p2, p3, inTri.color));
+            clippedTrianglesOut.add(triClipped1);
             
         } else if (insideCount == 2) {
             // Cycle until v[2] is the outside point
@@ -219,26 +220,29 @@ public class Renderer {
                 double td = d[0]; d[0] = d[1]; d[1] = d[2]; d[2] = td;
             }
             
-            // Quad formed by 2 Triangles
+            // Quad formed by 2 Triangles. Re-use triClipped1 and triClipped2.
+            
             // Tri 1: In1, In2, Intersect(In2->Out)
+            triClipped1.v[0].set(v[0]);
+            triClipped1.v[1].set(v[1]);
+            intersectPlane(planePoint, planeNormal, v[1], v[2], triClipped1.v[2]);
+            triClipped1.color = inTri.color;
+            
             // Tri 2: In1, Intersect(In2->Out), Intersect(In1->Out)
+            triClipped2.v[0].set(v[0]);
+            triClipped2.v[1].set(triClipped1.v[2]); // Reuse the point calculated above
+            intersectPlane(planePoint, planeNormal, v[0], v[2], triClipped2.v[2]);
+            triClipped2.color = inTri.color;
             
-            Vector3D p1 = v[0];
-            Vector3D p2 = v[1];
-            Vector3D p3 = intersectPlane(planePoint, planeNormal, v[1], v[2]);
-            Vector3D p4 = intersectPlane(planePoint, planeNormal, v[0], v[2]);
-            
-            outTriangles.add(new Triangle(p1, p2, p3, inTri.color));
-            outTriangles.add(new Triangle(p1, p3, p4, inTri.color));
+            clippedTrianglesOut.add(triClipped1);
+            clippedTrianglesOut.add(triClipped2);
         }
-        
-        return outTriangles;
     }
     
     /**
-     * Calculates the intersection point of a line segment and a plane.
+     * Calculates intersection and stores it in 'out'.
      */
-    private Vector3D intersectPlane(Vector3D planeP, Vector3D planeN, Vector3D lineStart, Vector3D lineEnd) {
+    private void intersectPlane(Vector3D planeP, Vector3D planeN, Vector3D lineStart, Vector3D lineEnd, Vector3D out) {
         planeN = planeN.normalize();
         double planeD = -planeN.dotProduct(planeP);
         double ad = lineStart.dotProduct(planeN);
@@ -246,5 +250,7 @@ public class Renderer {
         double t = (-planeD - ad) / (bd - ad);
         Vector3D lineStartToEnd = lineEnd.subtract(lineStart);
         Vector3D lineToIntersect = lineStartToEnd.multiply(t);
-        return lineStart.add(lineToIntersect);
+        
+        out.set(lineStart);
+        out.addInPlace(lineToIntersect);
     }}

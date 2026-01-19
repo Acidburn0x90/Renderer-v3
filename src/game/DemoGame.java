@@ -45,7 +45,7 @@ public class DemoGame extends Engine {
     
             // This gives a cool "Retro" pixelated look and ensures very high FPS (hundreds/thousands).
     
-            super(3200, 2000, "Renderer v3 - Terrain Demo", (double) 1/8);
+            super(1920, 1080, "Renderer v3 - Terrain Demo", (double) 1/4);
     
         }
     
