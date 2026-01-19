@@ -6,7 +6,7 @@ A professional-grade 3D engine built from scratch in Java without external graph
 
 *   **Software Rasterization**: Implements a pure Java Z-Buffer Rasterizer (`Scanline Algorithm`) for per-pixel depth testing, handling complex object intersections perfectly.
 *   **Zero-Allocation Architecture**: Heavily optimized to minimize Garbage Collection. Uses Object Pooling and In-Place Math for all per-frame calculations.
-*   **Frustum Culling**: Implements **Chunk-Based Culling**. The terrain is split into chunks, and chunks behind the camera are mathematically ignored before rendering.
+*   **Advanced Frustum Culling**: Implements a full **6-Plane Frustum Cull**. The engine mathematically extracts the visible volume from the View-Projection matrix and discards any terrain chunks that are outside the camera's field of view (left, right, top, bottom, near, far).
 *   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).
 *   **Clipping**: Implements **Sutherland-Hodgman** clipping to slice triangles against the Near Plane.
 *   **Procedural Terrain**: Uses **Perlin Noise** to generate infinite rolling hills.
@@ -24,25 +24,23 @@ The engine package contains the reusable core technology, completely decoupled f
 
 *   **`core/Engine.java`**: The abstract base class that manages the **Game Loop** (Fixed Time-Step), Window creation, and Input polling.
 *   **`core/Renderer.java`**: The heart of the graphics engine. It handles the entire pipeline:
-    0.  **Frustum Cull**: Checks if a mesh is behind the camera.
+    0.  **Frustum Cull**: Checks if a mesh is inside the 6 planes of the camera view.
     1.  **Transform**: Rotating/Translating vertices using cached vectors.
     2.  **Clip**: Slicing triangles against the Near Plane.
     3.  **Cull**: Back-face culling using dot products.
     4.  **Light**: Directional lighting calculation.
     5.  **Project**: Converting 3D -> 2D using Matrix math.
     6.  **Rasterize**: Drawing pixels to the Screen with Z-Buffering.
-*   **`graphics/Screen.java`**: The framebuffer.
-    *   `int[] pixels`: The color buffer.
-    *   `double[] zBuffer`: The depth buffer.
-    *   `fillTriangle()`: A custom scanline rasterizer.
-*   **`io/ObjLoader.java`**: A utility to parse `.obj` 3D model files into `Mesh` objects.
-*   **`core/Camera.java`**: Represents the observer. Handles Position (x,y,z) and Rotation (Pitch, Yaw).
-*   **`math/*`**: A robust math library optimized for zero-allocation (`Matrix4x4`, `Vector3D`, `PerlinNoise`).
+*   **`core/ViewFrustum.java`**: Extracts and stores the 6 geometric planes of the camera's view volume for efficient culling.
+*   **`graphics/Screen.java`**: The framebuffer (Color + Z-Buffer).
+*   **`io/ObjLoader.java`**: A utility to parse `.obj` 3D model files.
+*   **`core/Camera.java`**: Represents the observer.
+*   **`math/*`**: A robust math library (`Matrix4x4`, `Vector3D`, `Plane`, `PerlinNoise`).
 
 ### `src/game` (The Content)
 The game package uses the engine to create a specific experience.
 
-*   **`DemoGame.java`**: The main game implementation. It loads the scene, handles inputs, and toggles walking modes. Includes an **FPS Counter** and Stress Test scene.
+*   **`DemoGame.java`**: The main game implementation.
 *   **`Terrain.java`**: Encapsulates the procedural generation logic and splits the world into optimized **Chunks**.
 
 ### `src/Main.java`

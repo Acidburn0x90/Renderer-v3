@@ -53,6 +53,9 @@ public class Renderer {
     // Clipping planes are static/constant for now
     private final Vector3D planePoint = new Vector3D(0, 0, 0.1);
     private final Vector3D planeNormal = new Vector3D(0, 0, 1);
+    
+    // Frustum Culling
+    private final ViewFrustum frustum = new ViewFrustum();
 
     public Renderer(Screen screen) {
         this.screen = screen;
@@ -76,29 +79,38 @@ public class Renderer {
      * Processes a mesh: Transforms, Clips, Lights, Projects, and Draws directly to Screen.
      */
     public void renderMesh(Mesh mesh, Camera camera) {
-        // --- 0. FRUSTUM CULLING (Optimization) ---
-        // Check if the entire mesh is behind the camera.
+        // --- PREPARE MATRICES ---
+        // 1. Build View Matrix
+        // To move the world relative to the camera, we do:
+        // Translate(-CamPos) * RotateY(-CamYaw) * RotateX(-CamPitch)
+        // Note: We build this manually here for the Frustum Update.
+        // We still use the manual optimized path for vertices below to save allocations.
         
-        // Vector from Camera to Mesh Center
-        // V = Center - CamPos
-        Vector3D toMesh = mesh.center.subtract(camera.position);
-        
-        // Get Camera Forward Vector (Look Direction)
-        Vector3D forward = camera.getForward();
-        
-        // Project the mesh center onto the forward vector (Dot Product)
-        // Distance = how far "in front" of the camera the mesh center is.
-        double distanceAlongForward = toMesh.dotProduct(forward);
-        
-        // If the center is "behind" the camera plane by more than its radius, it is invisible.
-        // We use -radius because the sphere might overlap the plane even if the center is behind.
-        if (distanceAlongForward < -mesh.radius) {
-            return; // Skip drawing this entire mesh!
-        }
-
-        // Create Rotation Matrices based on Camera Orientation
+        Matrix4x4 matTrans = Matrix4x4.translation(-camera.position.x, -camera.position.y, -camera.position.z);
         Matrix4x4 matRotY = Matrix4x4.rotationY(-camera.yaw);
         Matrix4x4 matRotX = Matrix4x4.rotationX(-camera.pitch);
+        
+        // View = Trans * RotY * RotX (Order implies: Move then Rotate around camera origin)
+        // Wait, standard FPS camera is usually: Move World so Camera is at Origin -> Rotate World.
+        // Actually, logic in loop is: 
+        // 1. Translate (v - camPos)
+        // 2. RotY
+        // 3. RotX
+        // This corresponds to V = RotX * RotY * Trans
+        
+        Matrix4x4 matView = matTrans.multiply(matRotY).multiply(matRotX);
+        
+        // 2. Build View-Projection Matrix for Culling
+        Matrix4x4 matViewProj = matView.multiply(projectionMatrix);
+        
+        // 3. Update Frustum
+        frustum.update(matViewProj);
+
+        // --- 0. FRUSTUM CULLING ---
+        // Check if the mesh is completely outside the visible frustum
+        if (frustum.isSphereOutside(mesh.center, mesh.radius)) {
+            return; // Skip this mesh entirely
+        }
 
         // FIXED SUN LIGHTING SETUP (World Space)
         Vector3D worldLightDir = new Vector3D(0.2, 1.5, -0.5).normalize();

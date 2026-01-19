@@ -56,6 +56,37 @@ public class Matrix4x4 {
     }
 
     /**
+     * Multiplies two matrices. Result = This * Other.
+     * Note: Matrix multiplication is non-commutative (Order matters).
+     * 
+     * @param other The matrix to multiply by.
+     * @return A new Matrix4x4 representing the combined transformation.
+     */
+    public Matrix4x4 multiply(Matrix4x4 other) {
+        Matrix4x4 out = new Matrix4x4();
+        for (int r = 0; r < 4; r++) {
+            for (int c = 0; c < 4; c++) {
+                out.m[r][c] = m[r][0] * other.m[0][c] +
+                              m[r][1] * other.m[1][c] +
+                              m[r][2] * other.m[2][c] +
+                              m[r][3] * other.m[3][c];
+            }
+        }
+        return out;
+    }
+    
+    /**
+     * Creates a Translation Matrix.
+     */
+    public static Matrix4x4 translation(double x, double y, double z) {
+        Matrix4x4 matrix = makeIdentity();
+        matrix.m[3][0] = x;
+        matrix.m[3][1] = y;
+        matrix.m[3][2] = z;
+        return matrix;
+    }
+
+    /**
      * Creates an Identity Matrix.
      * <p>
      * An identity matrix is the "neutral" matrix. Multiplying by it changes nothing.
