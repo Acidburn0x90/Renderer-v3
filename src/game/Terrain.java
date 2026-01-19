@@ -5,6 +5,9 @@ import engine.math.PerlinNoise;
 import engine.math.Triangle;
 import engine.math.Vector3D;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Represents the game world terrain.
  * Encapsulates mesh generation and height queries for physics.
