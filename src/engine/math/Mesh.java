@@ -16,4 +16,20 @@ public class Mesh {
     public Mesh() {
         this.triangles = new ArrayList<>();
     }
+
+    /**
+     * Translates (moves) the entire mesh by the specified offset.
+     * @param x Offset X
+     * @param y Offset Y
+     * @param z Offset Z
+     */
+    public void translate(double x, double y, double z) {
+        for (Triangle tri : triangles) {
+            for (Vector3D v : tri.v) {
+                v.x += x;
+                v.y += y;
+                v.z += z;
+            }
+        }
+    }
 }

@@ -1,0 +1,27 @@
+# Standard Unit Cube
+# Vertices (x, y, z)
+# Front Face
+v -1.0 -1.0  1.0
+v  1.0 -1.0  1.0
+v  1.0  1.0  1.0
+v -1.0  1.0  1.0
+# Back Face
+v -1.0 -1.0 -1.0
+v  1.0 -1.0 -1.0
+v  1.0  1.0 -1.0
+v -1.0  1.0 -1.0
+
+# Faces (f v1 v2 v3 ...)
+# We use Counter-Clockwise winding order to ensure normals point OUTWARD.
+# (Front)
+f 1 2 3 4
+# (Top)
+f 4 3 7 8
+# (Right)
+f 2 6 7 3
+# (Left)
+f 1 5 8 4
+# (Bottom)
+f 1 2 6 5
+# (Back)
+f 6 5 8 7
