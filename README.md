@@ -1,70 +1,51 @@
-# Java Software Renderer v3
+# Java Software Renderer v3 (Single-Threaded Baseline)
 
 A professional-grade 3D engine built from scratch in Java without external graphics libraries (OpenGL/Vulkan). This project demonstrates the fundamental mathematics and architecture of 3D computer graphics by implementing them manually.
 
+**Current State**: This version represents the fully optimized **Single-Threaded** architecture. It serves as the baseline before the upgrade to a Tile-Based Multi-Threaded renderer.
+
 ## 🌟 Key Features
 
-*   **Software Rasterization**: Implements a pure Java Z-Buffer Rasterizer (`Scanline Algorithm`) for per-pixel depth testing, handling complex object intersections perfectly.
-*   **Gouraud Shading**: Supports smooth shading by interpolating lighting intensities across triangle surfaces. Calculates per-vertex normals for the terrain to create smooth, rolling hills.
-*   **Zero-Allocation Architecture**: Heavily optimized to minimize Garbage Collection. Uses Object Pooling and In-Place Math for all per-frame calculations.
-*   **Advanced Frustum Culling**: Implements a full **6-Plane Frustum Cull**. The engine mathematically extracts the visible volume from the View-Projection matrix and discards any terrain chunks that are outside the camera's field of view (left, right, top, bottom, near, far).
-*   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).
-*   **Clipping**: Implements **Sutherland-Hodgman** clipping to slice triangles against the Near Plane.
-*   **Procedural Terrain**: Uses **Perlin Noise** to generate infinite rolling hills.
-    *   **Physics Support**: Includes a height-map query system (`Terrain.getHeight`) for collision detection and walking.
-*   **OBJ Model Loading**: Supports loading standard `.obj` 3D models (vertices and faces) from disk.
-*   **Lighting**: Fixed Directional Lighting (Sun) calculated in World Space, rotated into View Space for correct shading relative to the camera.
-*   **FPS Camera**: Free-look camera with Mouse Locking (infinite rotation) and WASD movement.
-    *   **Walking Mode**: Gravity simulation that snaps the camera to the terrain surface.
-*   **Performance**: Optimized to handle thousands of triangles at 60+ FPS on standard hardware.
+*   **Software Rasterization**: Implements a pure Java Z-Buffer Rasterizer (`Scanline Algorithm`) for per-pixel depth testing.
+*   **Gouraud Shading**: Smooth lighting interpolation across triangle surfaces.
+*   **Fractal Terrain**: "Epic Scale" procedural world using 4-layered Perlin Noise (FBM) with dynamic biomes (Water, Sand, Grass, Snow).
+*   **Physics System**:
+    *   Gravity & Velocity integration.
+    *   **Jumping** and Ground Snapping.
+    *   **Head Bobbing** for realistic movement.
+    *   Terrain Collision detection.
+*   **Optimized Architecture**:
+    *   **Zero-Allocation**: Uses Object Pooling to eliminate GC pressure.
+    *   **Frustum Culling**: 6-Plane geometric culling to ignore invisible chunks.
+    *   **Terrain Chunking**: Splits the infinite world into managed sections.
+*   **Atmosphere**: Sky gradients and improved lighting contrast.
 
 ## 📂 Project Structure
 
 ### `src/engine` (The Technology)
 The engine package contains the reusable core technology, completely decoupled from any specific game logic.
 
-*   **`core/Engine.java`**: The abstract base class that manages the **Game Loop** (Fixed Time-Step), Window creation, and Input polling.
-*   **`core/Renderer.java`**: The heart of the graphics engine. It handles the entire pipeline:
-    0.  **Frustum Cull**: Checks if a mesh is inside the 6 planes of the camera view.
-    1.  **Transform**: Rotating/Translating vertices using cached vectors.
-    2.  **Clip**: Slicing triangles against the Near Plane.
-    3.  **Cull**: Back-face culling using dot products.
-    4.  **Light**: Directional lighting calculation.
-    5.  **Project**: Converting 3D -> 2D using Matrix math.
-    6.  **Rasterize**: Drawing pixels to the Screen with Z-Buffering.
-*   **`core/ViewFrustum.java`**: Extracts and stores the 6 geometric planes of the camera's view volume for efficient culling.
-*   **`graphics/Screen.java`**: The framebuffer (Color + Z-Buffer).
-*   **`io/ObjLoader.java`**: A utility to parse `.obj` 3D model files.
-*   **`core/Camera.java`**: Represents the observer.
-*   **`math/*`**: A robust math library (`Matrix4x4`, `Vector3D`, `Plane`, `PerlinNoise`).
+*   **`core/Renderer.java`**: The heart of the graphics engine (Transform -> Clip -> Light -> Project).
+*   **`core/ViewFrustum.java`**: Handles geometric culling.
+*   **`graphics/Screen.java`**: The framebuffer and Rasterizer.
+*   **`math/*`**: Zero-allocation math library (`Matrix4x4`, `Vector3D`, `Plane`, `PerlinNoise`).
 
 ### `src/game` (The Content)
-The game package uses the engine to create a specific experience.
-
-*   **`DemoGame.java`**: The main game implementation.
-*   **`Terrain.java`**: Encapsulates the procedural generation logic and splits the world into optimized **Chunks**.
-
-### `src/Main.java`
-*   The entry point. It simply instantiates `DemoGame` and calls `start()`.
+*   **`DemoGame.java`**: The main game loop and physics logic.
+*   **`Terrain.java`**: The Fractal Brownian Motion (FBM) terrain generator.
 
 ---
 
 ## 🎮 Controls
 
 *   **Mouse**: Look Around (Infinite Mouse Lock).
-*   **W / S**: Move Forward / Backward (Directional).
+*   **W / S**: Move Forward / Backward.
 *   **A / D**: Strafe Left / Right.
-*   **Space / Ctrl**: Fly Up / Down (Y-axis).
-*   **G**: **Toggle Walking Mode** (Gravity on/off).
+*   **Space**: **Jump** (when in Walking Mode).
+*   **G**: **Toggle Walking Mode** (Physics On/Off).
 *   **Shift**: Sprint.
 *   **ESC**: Quit.
 
-## 🛠️ Usage
-
-To run the engine:
-1.  Open the project in IntelliJ or any Java IDE.
-2.  Run `src/Main.java`.
-3.  Press **'G'** to drop to the ground and walk around!
-
 ---
 *Created as a learning project to understand the internals of 3D Graphics Engines.*
+
