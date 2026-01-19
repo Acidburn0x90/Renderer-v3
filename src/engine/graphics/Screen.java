@@ -19,55 +19,160 @@ public class Screen {
     private int height;
     private BufferedImage image;
     private int[] pixels;
-    private Graphics2D g; // High-performance graphics context for polygon filling
+    private double[] zBuffer; // Depth Buffer
+    private Graphics2D g;
 
     /**
      * Initializes the Screen with a specific width and height.
-     * It creates a BufferedImage and extracts its underlying integer array for direct manipulation.
-     *
-     * @param width  The width of the screen in pixels.
-     * @param height The height of the screen in pixels.
      */
     public Screen(int width, int height) {
         this.width = width;
         this.height = height;
-        
-        // Create a new image with integer precision (TYPE_INT_RGB).
-        // We avoid Alpha channel (ARGB) for speed, as we don't need transparency for the final buffer.
         this.image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        
-        // Link our 'pixels' array directly to the image's internal memory.
-        // This allows us to write 'pixels[i] = color' and have it update the image instantly
-        // without function call overhead for every pixel.
         this.pixels = ((DataBufferInt) this.image.getRaster().getDataBuffer()).getData();
-        
-        // Initialize Graphics2D for advanced drawing operations like fillPolygon
-        // which are hardware accelerated or highly optimized in the JVM.
+        this.zBuffer = new double[width * height]; // Allocate Z-Buffer
         this.g = this.image.createGraphics();
     }
 
     /**
      * Getter for the underlying BufferedImage.
-     * Used by the Window to draw the final result to the real screen.
-     * @return The rendered image.
      */
     public BufferedImage getImage() {
         return image;
     }
 
-    public int getWidth() {
-        return width;
-    }
+    public int getWidth() { return width; }
+    public int getHeight() { return height; }
 
-    public int getHeight() {
-        return height;
+    /**
+     * Clears the screen color.
+     */
+    public void clearPixels(String hexColor) {
+        g.setColor(new Color(hexStringToInt(hexColor)));
+        g.fillRect(0, 0, width, height);
+    }
+    
+    /**
+     * Resets the Z-Buffer to Infinity. 
+     * Must be called at the start of every frame.
+     */
+    public void clearZBuffer() {
+        Arrays.fill(zBuffer, Double.MAX_VALUE);
     }
 
     /**
-     * Helper method to parse hex strings (e.g., "#FF0000", "0xFF0000", "FF0000") into integers.
-     * Uses UnsignedInt parsing to handle the full 32-bit color range correctly.
-     * @param hexString should be in the following form e.g. "#RRGGBB" or "0xRRGGBB"
+     * Standard Rasterizer: Fills a triangle using Scanline conversion + Z-Buffering.
+     * Takes 3 vertices which MUST be in Screen Space (Pixels) but preserve their Z depth.
      */
+    public void fillTriangle(int x1, int y1, double z1, int x2, int y2, double z2, int x3, int y3, double z3, int color) {
+        // 1. Sort Vertices by Y (Top to Bottom) using a simple swap bubble-sort
+        // We want v1 to be top (min Y), v3 to be bottom (max Y)
+        if (y1 > y2) {
+            int ti = x1; x1 = x2; x2 = ti;
+            int ty = y1; y1 = y2; y2 = ty;
+            double tz = z1; z1 = z2; z2 = tz;
+        }
+        if (y1 > y3) {
+            int ti = x1; x1 = x3; x3 = ti;
+            int ty = y1; y1 = y3; y3 = ty;
+            double tz = z1; z1 = z3; z3 = tz;
+        }
+        if (y2 > y3) {
+            int ti = x2; x2 = x3; x3 = ti;
+            int ty = y2; y2 = y3; y3 = ty;
+            double tz = z2; z2 = z3; z3 = tz;
+        }
+
+        // 2. Rasterize
+        // Triangle is split into two parts: Top-Flat and Bottom-Flat by the middle vertex (v2).
+        
+        // Slopes (Change in X per Y, Change in Z per Y)
+        // Inverse slopes: dX/dY
+        double dX13 = 0, dX12 = 0, dX23 = 0;
+        double dZ13 = 0, dZ12 = 0, dZ23 = 0;
+
+        if (y3 != y1) {
+            dX13 = (double)(x3 - x1) / (y3 - y1);
+            dZ13 = (z3 - z1) / (y3 - y1);
+        }
+        if (y2 != y1) {
+            dX12 = (double)(x2 - x1) / (y2 - y1);
+            dZ12 = (z2 - z1) / (y2 - y1);
+        }
+        if (y3 != y2) {
+            dX23 = (double)(x3 - x2) / (y3 - y2);
+            dZ23 = (z3 - z2) / (y3 - y2);
+        }
+
+        // Iterate Scanlines
+        
+        // --- Top Half (v1 to v2) ---
+        // We walk down edges v1->v3 (Long) and v1->v2 (Short)
+        double curX_A = x1;
+        double curZ_A = z1;
+        double curX_B = x1;
+        double curZ_B = z1;
+
+        for (int y = y1; y < y2; y++) {
+            drawScanline(y, (int)curX_A, curZ_A, (int)curX_B, curZ_B, color);
+            curX_A += dX13; curZ_A += dZ13;
+            curX_B += dX12; curZ_B += dZ12;
+        }
+
+        // --- Bottom Half (v2 to v3) ---
+        // We continue walking v1->v3 (Long) but switch short edge to v2->v3
+        // Note: curX_A/Z_A are already correct from the previous loop (tracking v1->v3)
+        // We just reset B to start at v2
+        curX_B = x2;
+        curZ_B = z2;
+        
+        for (int y = y2; y <= y3; y++) {
+            drawScanline(y, (int)curX_A, curZ_A, (int)curX_B, curZ_B, color);
+            curX_A += dX13; curZ_A += dZ13;
+            curX_B += dX23; curZ_B += dZ23;
+        }
+    }
+    
+    /**
+     * Draws a single horizontal line, interpolating Z and checking the Z-Buffer.
+     */
+    private void drawScanline(int y, int xStart, double zStart, int xEnd, double zEnd, int color) {
+        // Ensure Left-to-Right
+        if (xStart > xEnd) {
+            int ti = xStart; xStart = xEnd; xEnd = ti;
+            double tz = zStart; zStart = zEnd; zEnd = tz;
+        }
+
+        // Clipping (Y-axis)
+        if (y < 0 || y >= height) return;
+
+        // Calculate Step for Z interpolation
+        double zStep = (zEnd - zStart) / (double)(xEnd - xStart);
+        double curZ = zStart;
+
+        // X-axis Clipping bounds
+        int realXStart = Math.max(0, xStart);
+        int realXEnd = Math.min(width - 1, xEnd);
+        
+        // Adjust Z if we clipped the start
+        curZ += zStep * (realXStart - xStart);
+
+        int bufferRowOffset = y * width;
+        
+        for (int x = realXStart; x <= realXEnd; x++) {
+            int idx = bufferRowOffset + x;
+            
+            // --- Z-BUFFER TEST ---
+            // Only draw if this pixel is closer (smaller Z) than what's already there
+            if (curZ < zBuffer[idx]) {
+                zBuffer[idx] = curZ; // Update Depth
+                pixels[idx] = color; // Draw Pixel
+            }
+            
+            curZ += zStep;
+        }
+    }
+
     public static int hexStringToInt(String hexString) {
         hexString = hexString.toUpperCase();
         if (hexString.startsWith("#")) {
@@ -84,27 +189,7 @@ public class Screen {
      * Clears the entire screen to black (0).
      */
     public void clearPixels() {
-        // Using Graphics2D is often faster than iterating the array in Java
-        // because it uses native code/hardware accel under the hood.
-        g.setColor(Color.BLACK);
-        g.fillRect(0, 0, width, height);
-    }
-
-    /**
-     * Clears the entire screen to a specific hex color.
-     */
-    public void clearPixels(String hexColor) {
-        g.setColor(new Color(hexStringToInt(hexColor)));
-        g.fillRect(0, 0, width, height);
-    }
-
-    /**
-     * Fills a solid triangle using Hardware Acceleration (Graphics2D).
-     * This is significantly faster than writing a software scanline algorithm in pure Java.
-     */
-    public void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3, int color) {
-        g.setColor(new Color(color));
-        g.fillPolygon(new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
+        Arrays.fill(pixels, 0); // Fast native array fill
     }
 
     /**
