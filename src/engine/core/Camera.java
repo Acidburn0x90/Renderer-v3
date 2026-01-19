@@ -27,7 +27,7 @@ public class Camera {
     // Physics Constants
     private static final double GRAVITY = 0.015;
     private static final double JUMP_FORCE = 0.4;
-    private static final double PLAYER_HEIGHT = 2.0;
+    public double eyeHeight = 2.0; // Dynamic eye level (allows bobbing/crouching)
 
     public Camera() {
         this.position = new Vector3D(0, 0, 0);
@@ -53,12 +53,12 @@ public class Camera {
         
         // 4. Terrain Collision
         double groundHeight = terrain.getHeight(position.x, position.z);
-        double feetY = position.y + PLAYER_HEIGHT; // The bottom of the player
+        double feetY = position.y + eyeHeight; // The bottom of the player
         
         // If feet are below ground
         if (feetY > groundHeight) {
             // Snap to ground
-            position.y = groundHeight - PLAYER_HEIGHT;
+            position.y = groundHeight - eyeHeight;
             vy = 0;
             isGrounded = true;
         } else {

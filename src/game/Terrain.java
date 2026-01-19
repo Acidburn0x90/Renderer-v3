@@ -39,46 +39,53 @@ public class Terrain {
     }
 
     /**
+     * Samples the fractal noise at a given grid coordinate.
+     * This combines multiple "octaves" of noise to create realistic terrain.
+     */
+    private double sampleHeight(double x, double z) {
+        double total = 0;
+        double frequency = NOISE_FREQUENCY;
+        double amplitude = HEIGHT_AMPLITUDE;
+        double persistence = 0.5; // How much each octave contributes
+        double lacunarity = 2.0;   // How much frequency increases per octave
+        
+        // Layer 1: Big Mountains
+        total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+        
+        // Layer 2: Smaller Hills
+        frequency *= lacunarity;
+        amplitude *= persistence;
+        total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+        
+        // Layer 3: Surface Roughness/Rocks
+        frequency *= lacunarity;
+        amplitude *= persistence;
+        total += noise.noise(x * frequency, 0, z * frequency) * amplitude;
+        
+        return total;
+    }
+
+    /**
      * Calculates the terrain height at a specific world coordinate.
-     * <p>
-     * This method allows us to query the "Physics Ground" at any point, independent of where the vertices are.
-     * It works by reversing the math used to generate the mesh vertices.
-     * </p>
-     * 
-     * @param worldX X coordinate in world space.
-     * @param worldZ Z coordinate in world space.
-     * @return The Y coordinate of the terrain at this point.
      */
     public double getHeight(double worldX, double worldZ) {
-        // 1. Convert World Coords -> Grid Coords (Inverse of generation logic)
-        // In generation: xWorld = (xGrid - width/2.0) * scale
-        // Therefore: xGrid = (xWorld / scale) + width/2.0
         double xGrid = (worldX / scale) + (width / 2.0);
         double zGrid = (worldZ / scale) + (depth / 2.0);
-        
-        // 2. Sample the Perlin Noise
-        // Note: In generation we iterated over integer grid points (0, 1, 2...).
-        // Here, xGrid and zGrid are doubles (e.g., 10.5).
-        // This is fine because Perlin Noise is a continuous function—it returns smooth values
-        // even between the integer grid points.
-        double y = noise.noise(xGrid * NOISE_FREQUENCY, 0, zGrid * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-        
-        return y;
+        return sampleHeight(xGrid, zGrid);
     }
 
     /**
      * Calculates the surface normal at a specific grid coordinate.
-     * Used for smooth (Gouraud) shading.
+     * Updated to handle multi-layered noise accurately.
      */
     public Vector3D getNormal(int x, int z) {
-        // We approximate the normal by looking at the heights of neighbors.
-        // n = (-dy/dx, 1, -dy/dz)
-        double hL = noise.noise((x - 1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-        double hR = noise.noise((x + 1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-        double hD = noise.noise(x * NOISE_FREQUENCY, 0, (z - 1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-        double hU = noise.noise(x * NOISE_FREQUENCY, 0, (z + 1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+        double hL = sampleHeight(x - 0.1, z);
+        double hR = sampleHeight(x + 0.1, z);
+        double hD = sampleHeight(x, z - 0.1);
+        double hU = sampleHeight(x, z + 0.1);
         
-        return new Vector3D(hL - hR, 2.0, hD - hU).normalize();
+        // We use a small epsilon (0.1) for sampling to get a smooth local gradient
+        return new Vector3D(hL - hR, 0.2, hD - hU).normalize();
     }
 
     private void generateChunks() {
@@ -99,11 +106,11 @@ public class Terrain {
                         double x1 = (x + 1 - width/2.0) * scale;
                         double z1 = (z + 1 - depth/2.0) * scale;
                         
-                        // Heights
-                        double y00 = noise.noise(x * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-                        double y01 = noise.noise(x * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-                        double y10 = noise.noise((x+1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
-                        double y11 = noise.noise((x+1) * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+                        // Heights (using Fractal Noise)
+                        double y00 = sampleHeight(x, z);
+                        double y01 = sampleHeight(x, z + 1);
+                        double y10 = sampleHeight(x + 1, z);
+                        double y11 = sampleHeight(x + 1, z + 1);
                         
                         // Normals
                         Vector3D n00 = getNormal(x, z);
@@ -111,8 +118,13 @@ public class Terrain {
                         Vector3D n10 = getNormal(x + 1, z);
                         Vector3D n11 = getNormal(x + 1, z + 1);
 
-                        // Coloring
-                        int color = (y00 < 0.0) ? 0x2E8B57 : (y00 < 4.0) ? 0x8B4513 : 0xFFFFFF;
+                        // Improved Dynamic Coloring
+                        int color;
+                        if (y00 < -2.0) color = 0x2E8B57; // Deep Sea
+                        else if (y00 < 0.0) color = 0x3CB371; // Shallow Water
+                        else if (y00 < 1.0) color = 0xC2B280; // Sand/Beach
+                        else if (y00 < 8.0) color = 0x8B4513; // Dirt/Hills
+                        else color = 0xFFFFFF; // Snow Peaks
 
                         // Triangle 1
                         Triangle t1 = new Triangle(

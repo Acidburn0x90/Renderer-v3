@@ -35,8 +35,9 @@ public class DemoGame extends Engine {
     
         private long timer = System.currentTimeMillis();
     
-    
-    
+        // Head Bobbing
+        private double walkDistance = 0;
+
         public DemoGame() {
     
             // Initialize Engine with specific window settings
@@ -45,7 +46,7 @@ public class DemoGame extends Engine {
     
             // This gives a cool "Retro" pixelated look and ensures very high FPS (hundreds/thousands).
     
-            super(1920, 1080, "Renderer v3 - Terrain Demo", (double) 1/4);
+            super(2560, 1440, "Renderer v3 - Terrain Demo", (double) 1/4);
     
         }
     
@@ -180,7 +181,7 @@ public class DemoGame extends Engine {
             
     
                     double speed = 0.1;
-    
+                    boolean isMoving = false;
             
     
                     if (input.isKey(KeyEvent.VK_SHIFT)) speed = 0.3; // Sprint
@@ -195,26 +196,35 @@ public class DemoGame extends Engine {
     
             
     
-                    if (input.isKey(KeyEvent.VK_W)) camera.moveForward(speed);
+                    if (input.isKey(KeyEvent.VK_W)) { camera.moveForward(speed); isMoving = true; }
     
             
     
-                    if (input.isKey(KeyEvent.VK_S)) camera.moveBackward(speed);
+                    if (input.isKey(KeyEvent.VK_S)) { camera.moveBackward(speed); isMoving = true; }
     
             
     
-                    if (input.isKey(KeyEvent.VK_A)) camera.moveLeft(speed);
+                    if (input.isKey(KeyEvent.VK_A)) { camera.moveLeft(speed); isMoving = true; }
     
             
     
-                    if (input.isKey(KeyEvent.VK_D)) camera.moveRight(speed);
+                    if (input.isKey(KeyEvent.VK_D)) { camera.moveRight(speed); isMoving = true; }
     
             
     
-                    
-    
-            
-    
+                    // --- Head Bobbing ---
+                    // Only bob when walking on the ground
+                    if (walkingMode && isMoving) {
+                        walkDistance += speed * 1.5; // Frequency
+                        // Calculate bobbing offset (-0.1 to +0.1)
+                        double bob = Math.sin(walkDistance) * 0.1;
+                        camera.eyeHeight = 2.0 + bob;
+                    } else {
+                        // Reset to neutral height smoothly
+                        camera.eyeHeight = 2.0; 
+                        walkDistance = 0; // Reset cycle
+                    }
+
                     // Vertical Movement (Global Axis)
     
             
