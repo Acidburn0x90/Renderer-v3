@@ -66,6 +66,21 @@ public class Terrain {
         return y;
     }
 
+    /**
+     * Calculates the surface normal at a specific grid coordinate.
+     * Used for smooth (Gouraud) shading.
+     */
+    public Vector3D getNormal(int x, int z) {
+        // We approximate the normal by looking at the heights of neighbors.
+        // n = (-dy/dx, 1, -dy/dz)
+        double hL = noise.noise((x - 1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+        double hR = noise.noise((x + 1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+        double hD = noise.noise(x * NOISE_FREQUENCY, 0, (z - 1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+        double hU = noise.noise(x * NOISE_FREQUENCY, 0, (z + 1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
+        
+        return new Vector3D(hL - hR, 2.0, hD - hU).normalize();
+    }
+
     private void generateChunks() {
         // Loop through the grid in steps of CHUNK_SIZE
         for (int startX = 0; startX < width; startX += CHUNK_SIZE) {
@@ -73,55 +88,54 @@ public class Terrain {
                 
                 Mesh chunk = new Mesh();
                 
-                // Process the squares INSIDE this chunk
-                // Ensure we don't go out of bounds (Math.min)
                 int endX = Math.min(startX + CHUNK_SIZE, width);
                 int endZ = Math.min(startZ + CHUNK_SIZE, depth);
                 
                 for (int x = startX; x < endX; x++) {
                     for (int z = startZ; z < endZ; z++) {
-                        // Calculate position of the current square's corners
+                        // Coordinates
                         double x0 = (x - width/2.0) * scale;
                         double z0 = (z - depth/2.0) * scale;
-                        
                         double x1 = (x + 1 - width/2.0) * scale;
                         double z1 = (z + 1 - depth/2.0) * scale;
                         
-                        // Get Heights
+                        // Heights
                         double y00 = noise.noise(x * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
                         double y01 = noise.noise(x * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
                         double y10 = noise.noise((x+1) * NOISE_FREQUENCY, 0, z * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
                         double y11 = noise.noise((x+1) * NOISE_FREQUENCY, 0, (z+1) * NOISE_FREQUENCY) * HEIGHT_AMPLITUDE;
                         
-                        // Coloring Logic
-                        int color;
-                        if (y00 < 0.0) {
-                            color = 0x2E8B57; // Sea Green
-                        } else if (y00 < 4.0) {
-                            color = 0x8B4513; // Saddle Brown
-                        } else {
-                            color = 0xFFFFFF; // Snow
-                        }
+                        // Normals
+                        Vector3D n00 = getNormal(x, z);
+                        Vector3D n01 = getNormal(x, z + 1);
+                        Vector3D n10 = getNormal(x + 1, z);
+                        Vector3D n11 = getNormal(x + 1, z + 1);
+
+                        // Coloring
+                        int color = (y00 < 0.0) ? 0x2E8B57 : (y00 < 4.0) ? 0x8B4513 : 0xFFFFFF;
 
                         // Triangle 1
-                        chunk.triangles.add(new Triangle(
+                        Triangle t1 = new Triangle(
                             new Vector3D(x0, y00, z0),
                             new Vector3D(x1, y11, z1),
                             new Vector3D(x0, y01, z1),
                             color
-                        ));
+                        );
+                        t1.n[0] = n00; t1.n[1] = n11; t1.n[2] = n01;
+                        chunk.triangles.add(t1);
                         
                         // Triangle 2
-                        chunk.triangles.add(new Triangle(
+                        Triangle t2 = new Triangle(
                             new Vector3D(x0, y00, z0),
                             new Vector3D(x1, y10, z0),
                             new Vector3D(x1, y11, z1),
                             color
-                        ));
+                        );
+                        t2.n[0] = n00; t2.n[1] = n10; t2.n[2] = n11;
+                        chunk.triangles.add(t2);
                     }
                 }
                 
-                // Important: Calculate the bounding sphere for this chunk!
                 chunk.recalculateBounds();
                 chunks.add(chunk);
             }

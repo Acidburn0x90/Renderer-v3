@@ -63,113 +63,144 @@ public class Screen {
     /**
      * Standard Rasterizer: Fills a triangle using Scanline conversion + Z-Buffering.
      * Takes 3 vertices which MUST be in Screen Space (Pixels) but preserve their Z depth.
+     * 
+     * @param l1, l2, l3 Lighting intensity at each vertex (0.0 to 1.0)
      */
-    public void fillTriangle(int x1, int y1, double z1, int x2, int y2, double z2, int x3, int y3, double z3, int color) {
+    public void fillTriangle(int x1, int y1, double z1, double l1,
+                             int x2, int y2, double z2, double l2,
+                             int x3, int y3, double z3, double l3,
+                             int color) {
         // 1. Sort Vertices by Y (Top to Bottom) using a simple swap bubble-sort
         // We want v1 to be top (min Y), v3 to be bottom (max Y)
         if (y1 > y2) {
             int ti = x1; x1 = x2; x2 = ti;
             int ty = y1; y1 = y2; y2 = ty;
             double tz = z1; z1 = z2; z2 = tz;
+            double tl = l1; l1 = l2; l2 = tl;
         }
         if (y1 > y3) {
             int ti = x1; x1 = x3; x3 = ti;
             int ty = y1; y1 = y3; y3 = ty;
             double tz = z1; z1 = z3; z3 = tz;
+            double tl = l1; l1 = l3; l3 = tl;
         }
         if (y2 > y3) {
             int ti = x2; x2 = x3; x3 = ti;
             int ty = y2; y2 = y3; y3 = ty;
             double tz = z2; z2 = z3; z3 = tz;
+            double tl = l2; l2 = l3; l3 = tl;
         }
 
         // 2. Rasterize
         // Triangle is split into two parts: Top-Flat and Bottom-Flat by the middle vertex (v2).
         
-        // Slopes (Change in X per Y, Change in Z per Y)
-        // Inverse slopes: dX/dY
+        // Slopes (Change in X, Z, and Lighting per Y)
         double dX13 = 0, dX12 = 0, dX23 = 0;
         double dZ13 = 0, dZ12 = 0, dZ23 = 0;
+        double dL13 = 0, dL12 = 0, dL23 = 0;
 
         if (y3 != y1) {
             dX13 = (double)(x3 - x1) / (y3 - y1);
             dZ13 = (z3 - z1) / (y3 - y1);
+            dL13 = (l3 - l1) / (y3 - y1);
         }
         if (y2 != y1) {
             dX12 = (double)(x2 - x1) / (y2 - y1);
             dZ12 = (z2 - z1) / (y2 - y1);
+            dL12 = (l2 - l1) / (y2 - y1);
         }
         if (y3 != y2) {
             dX23 = (double)(x3 - x2) / (y3 - y2);
             dZ23 = (z3 - z2) / (y3 - y2);
+            dL23 = (l3 - l2) / (y3 - y2);
         }
 
         // Iterate Scanlines
         
         // --- Top Half (v1 to v2) ---
-        // We walk down edges v1->v3 (Long) and v1->v2 (Short)
         double curX_A = x1;
         double curZ_A = z1;
+        double curL_A = l1;
         double curX_B = x1;
         double curZ_B = z1;
+        double curL_B = l1;
 
         for (int y = y1; y < y2; y++) {
-            drawScanline(y, (int)curX_A, curZ_A, (int)curX_B, curZ_B, color);
-            curX_A += dX13; curZ_A += dZ13;
-            curX_B += dX12; curZ_B += dZ12;
+            drawScanline(y, (int)curX_A, curZ_A, curL_A, (int)curX_B, curZ_B, curL_B, color);
+            curX_A += dX13; curZ_A += dZ13; curL_A += dL13;
+            curX_B += dX12; curZ_B += dZ12; curL_B += dL12;
         }
 
         // --- Bottom Half (v2 to v3) ---
-        // We continue walking v1->v3 (Long) but switch short edge to v2->v3
-        // Note: curX_A/Z_A are already correct from the previous loop (tracking v1->v3)
-        // We just reset B to start at v2
         curX_B = x2;
         curZ_B = z2;
+        curL_B = l2;
         
         for (int y = y2; y <= y3; y++) {
-            drawScanline(y, (int)curX_A, curZ_A, (int)curX_B, curZ_B, color);
-            curX_A += dX13; curZ_A += dZ13;
-            curX_B += dX23; curZ_B += dZ23;
+            drawScanline(y, (int)curX_A, curZ_A, curL_A, (int)curX_B, curZ_B, curL_B, color);
+            curX_A += dX13; curZ_A += dZ13; curL_A += dL13;
+            curX_B += dX23; curZ_B += dZ23; curL_B += dL23;
         }
     }
     
     /**
-     * Draws a single horizontal line, interpolating Z and checking the Z-Buffer.
+     * Draws a single horizontal line, interpolating Z and Lighting, and checking the Z-Buffer.
      */
-    private void drawScanline(int y, int xStart, double zStart, int xEnd, double zEnd, int color) {
+    private void drawScanline(int y, int xStart, double zStart, double lStart, 
+                                     int xEnd, double zEnd, double lEnd, int color) {
         // Ensure Left-to-Right
         if (xStart > xEnd) {
             int ti = xStart; xStart = xEnd; xEnd = ti;
             double tz = zStart; zStart = zEnd; zEnd = tz;
+            double tl = lStart; lStart = lEnd; lEnd = tl;
         }
 
         // Clipping (Y-axis)
         if (y < 0 || y >= height) return;
 
-        // Calculate Step for Z interpolation
-        double zStep = (zEnd - zStart) / (double)(xEnd - xStart);
+        // Calculate Steps for interpolation
+        double width = (double)(xEnd - xStart);
+        if (width <= 0) width = 1;
+
+        double zStep = (zEnd - zStart) / width;
+        double lStep = (lEnd - lStart) / width;
+
         double curZ = zStart;
+        double curL = lStart;
 
         // X-axis Clipping bounds
         int realXStart = Math.max(0, xStart);
-        int realXEnd = Math.min(width - 1, xEnd);
+        int realXEnd = Math.min(this.width - 1, xEnd);
         
-        // Adjust Z if we clipped the start
-        curZ += zStep * (realXStart - xStart);
+        // Adjust start values if we clipped the start
+        double offset = (realXStart - xStart);
+        curZ += zStep * offset;
+        curL += lStep * offset;
 
-        int bufferRowOffset = y * width;
+        int bufferRowOffset = y * this.width;
         
+        // Base color components
+        int rBase = (color >> 16) & 0xFF;
+        int gBase = (color >> 8) & 0xFF;
+        int bBase = color & 0xFF;
+
         for (int x = realXStart; x <= realXEnd; x++) {
             int idx = bufferRowOffset + x;
             
             // --- Z-BUFFER TEST ---
-            // Only draw if this pixel is closer (smaller Z) than what's already there
             if (curZ < zBuffer[idx]) {
-                zBuffer[idx] = curZ; // Update Depth
-                pixels[idx] = color; // Draw Pixel
+                zBuffer[idx] = curZ; 
+                
+                // Apply Lighting to Base Color
+                int r = (int)(rBase * curL);
+                int g = (int)(gBase * curL);
+                int b = (int)(bBase * curL);
+                
+                pixels[idx] = (r << 16) | (g << 8) | b;
             }
             
             curZ += zStep;
+            curL += lStep;
         }
     }
 

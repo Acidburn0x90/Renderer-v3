@@ -5,6 +5,7 @@ A professional-grade 3D engine built from scratch in Java without external graph
 ## 🌟 Key Features
 
 *   **Software Rasterization**: Implements a pure Java Z-Buffer Rasterizer (`Scanline Algorithm`) for per-pixel depth testing, handling complex object intersections perfectly.
+*   **Gouraud Shading**: Supports smooth shading by interpolating lighting intensities across triangle surfaces. Calculates per-vertex normals for the terrain to create smooth, rolling hills.
 *   **Zero-Allocation Architecture**: Heavily optimized to minimize Garbage Collection. Uses Object Pooling and In-Place Math for all per-frame calculations.
 *   **Advanced Frustum Culling**: Implements a full **6-Plane Frustum Cull**. The engine mathematically extracts the visible volume from the View-Projection matrix and discards any terrain chunks that are outside the camera's field of view (left, right, top, bottom, near, far).
 *   **3D Pipeline**: Full Vertex Transformation pipeline (Model -> View -> Clip -> Projection -> Screen).

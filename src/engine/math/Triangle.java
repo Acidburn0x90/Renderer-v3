@@ -6,6 +6,8 @@ package engine.math;
  */
 public class Triangle {
     public Vector3D[] v;
+    public Vector3D[] n;     // Vertex Normals for smooth shading
+    public double[] lighting; // Gouraud Shading: Light intensity per vertex (0.0 to 1.0)
     public int color;
 
     /**
@@ -17,6 +19,8 @@ public class Triangle {
      */
     public Triangle(Vector3D v1, Vector3D v2, Vector3D v3, int color) {
         this.v = new Vector3D[]{v1, v2, v3};
+        this.n = new Vector3D[]{new Vector3D(0,1,0), new Vector3D(0,1,0), new Vector3D(0,1,0)};
+        this.lighting = new double[]{1.0, 1.0, 1.0}; // Default to full brightness
         this.color = color;
     }
     

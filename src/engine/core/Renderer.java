@@ -159,21 +159,33 @@ public class Renderer {
 
                 if (vNormal.dotProduct(vCameraRay) < 0.0f) {
                     
-                    // 5. LIGHTING (Improved Contrast)
-                    double dp = vNormal.dotProduct(viewLightDir);
+                    // 5. LIGHTING (Gouraud Shading)
+                    // Calculate lighting intensity for each of the 3 vertices
+                    for (int i = 0; i < 3; i++) {
+                        // Rotate the vertex normal into view space
+                        vNormal.set(clipped.n[i]);
+                        Vector3D rotatedNormal = matRotY.multiplyVector(vNormal);
+                        rotatedNormal = matRotX.multiplyVector(rotatedNormal);
+                        
+                        double dp = rotatedNormal.dotProduct(viewLightDir);
+                        
+                        // Ambient + Diffuse
+                        double ambient = 0.2;
+                        double diffuse = Math.max(0, dp);
+                        double brightness = ambient + (1.0 - ambient) * diffuse;
+                        
+                        // Boost contrast
+                        brightness = Math.pow(brightness, 1.2); 
+                        clipped.lighting[i] = brightness;
+                    }
                     
-                    // Ambient + Diffuse (Wrapped lighting for softer shadows)
-                    double ambient = 0.2;
-                    double diffuse = Math.max(0, dp);
-                    double brightness = ambient + (1.0 - ambient) * diffuse;
-                    
-                    // Boost contrast slightly
-                    brightness = Math.pow(brightness, 1.2); 
+                    // Use average brightness for the base color clipping (optional)
+                    double avgBrightness = (clipped.lighting[0] + clipped.lighting[1] + clipped.lighting[2]) / 3.0;
                     
                     int baseColor = clipped.color;
-                    int r = (int)(((baseColor >> 16) & 0xFF) * brightness);
-                    int g = (int)(((baseColor >> 8) & 0xFF) * brightness);
-                    int b = (int)((baseColor & 0xFF) * brightness);
+                    int r = (int)(((baseColor >> 16) & 0xFF) * avgBrightness);
+                    int g = (int)(((baseColor >> 8) & 0xFF) * avgBrightness);
+                    int b = (int)((baseColor & 0xFF) * avgBrightness);
                     r = Math.min(255, Math.max(0, r));
                     g = Math.min(255, Math.max(0, g));
                     b = Math.min(255, Math.max(0, b));
@@ -186,13 +198,15 @@ public class Renderer {
                         // Scale to Screen
                         triProjected.v[i].x = (triProjected.v[i].x + 1.0) * 0.5 * screen.getWidth();
                         triProjected.v[i].y = (triProjected.v[i].y + 1.0) * 0.5 * screen.getHeight();
+                        
+                        triProjected.lighting[i] = clipped.lighting[i];
                     }
 
                     // 7. RASTERIZE
                     screen.fillTriangle(
-                        (int)triProjected.v[0].x, (int)triProjected.v[0].y, triProjected.v[0].z,
-                        (int)triProjected.v[1].x, (int)triProjected.v[1].y, triProjected.v[1].z,
-                        (int)triProjected.v[2].x, (int)triProjected.v[2].y, triProjected.v[2].z,
+                        (int)triProjected.v[0].x, (int)triProjected.v[0].y, triProjected.v[0].z, triProjected.lighting[0],
+                        (int)triProjected.v[1].x, (int)triProjected.v[1].y, triProjected.v[1].z, triProjected.lighting[1],
+                        (int)triProjected.v[2].x, (int)triProjected.v[2].y, triProjected.v[2].z, triProjected.lighting[2],
                         finalColor
                     );
                 }
