@@ -59,7 +59,7 @@ public class DemoGame extends Engine {
         
         // The model loads at (0,0,0). We translate (move) it so it doesn't clip into the ground.
         // Coordinates: X=0, Y=-10 (Up), Z=5 (Forward).
-        cube.translate(0, -10, 5); 
+        cube.translate(0, -10, 0);
         meshes.add(cube);
     }
 

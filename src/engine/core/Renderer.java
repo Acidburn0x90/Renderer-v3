@@ -93,26 +93,30 @@ public class Renderer {
             }
 
             // 3. CLIP (Near Plane)
-            // If a triangle is behind the camera (Z < 0.1), discard it.
-            // Simple implementation: if ANY vertex is behind, discard. (Proper clipping would slice the triangle).
-            if (triView.v[0].z < 0.1 || triView.v[1].z < 0.1 || triView.v[2].z < 0.1) {
-                continue;
-            }
+            // Use the Sutherland-Hodgman algorithm to slice triangles against the Near Plane (Z=0.1).
+            // This prevents the "disappearing ground" bug when walking.
+            List<Triangle> clippedTriangles = clipTriangleAgainstPlane(
+                new Vector3D(0, 0, 0.1), // Plane Point
+                new Vector3D(0, 0, 1),   // Plane Normal
+                triView
+            );
 
-            // 4. CULL (Backface Culling)
-            // Determine if the triangle is facing the camera.
-            // Calculate Surface Normal.
-            Vector3D line1 = triView.v[1].subtract(triView.v[0]);
-            Vector3D line2 = triView.v[2].subtract(triView.v[0]);
-            Vector3D normal = line1.crossProduct(line2).normalize();
-            
-            // Vector from Camera (0,0,0) to Triangle.
-            Vector3D cameraRay = triView.v[0].subtract(new Vector3D(0,0,0));
+            for (Triangle clipped : clippedTriangles) {
+                // 4. CULL (Backface Culling)
+                // Determine if the triangle is facing the camera.
+                // Calculate Surface Normal.
+                Vector3D line1 = clipped.v[1].subtract(clipped.v[0]);
+                Vector3D line2 = clipped.v[2].subtract(clipped.v[0]);
+                Vector3D normal = line1.crossProduct(line2).normalize();
+                
+                // Vector from Camera (0,0,0) to Triangle.
+                Vector3D cameraRay = clipped.v[0].subtract(new Vector3D(0,0,0));
 
-            // Dot Product < 0 means the normal is pointing towards the camera.
-            if (normal.dotProduct(cameraRay) < 0.0f) {
-                // Triangle is visible, add to list for sorting later.
-                trianglesToRaster.add(triView);
+                // Dot Product < 0 means the normal is pointing towards the camera.
+                if (normal.dotProduct(cameraRay) < 0.0f) {
+                    // Triangle is visible, add to list for sorting later.
+                    trianglesToRaster.add(clipped);
+                }
             }
         }
     }
@@ -199,4 +203,88 @@ public class Renderer {
             );
         }
     }
-}
+
+    /**
+     * Clips a triangle against a plane.
+     * Returns 0, 1, or 2 triangles.
+     */
+    private List<Triangle> clipTriangleAgainstPlane(Vector3D planePoint, Vector3D planeNormal, Triangle inTri) {
+        List<Triangle> outTriangles = new ArrayList<>();
+        planeNormal = planeNormal.normalize();
+        
+        // 1. Calculate distance of each point from the plane
+        // dist = (point - planePoint) . normal
+        double[] dist = new double[3];
+        int insideCount = 0;
+        int outsideCount = 0;
+        
+        for (int i = 0; i < 3; i++) {
+            dist[i] = inTri.v[i].subtract(planePoint).dotProduct(planeNormal);
+            if (dist[i] >= 0) insideCount++;
+            else outsideCount++;
+        }
+        
+        if (insideCount == 0) return outTriangles; // All outside
+        if (insideCount == 3) {
+            outTriangles.add(inTri); // All inside
+            return outTriangles;
+        }
+        
+        // 2. Classify and Reorder Vertices
+        // We rotate the vertices so that:
+        // - If 1 point is inside, it is at index 0.
+        // - If 2 points are inside, the ONE outside point is at index 2.
+        
+        Vector3D[] v = new Vector3D[]{ inTri.v[0], inTri.v[1], inTri.v[2] };
+        double[] d = new double[]{ dist[0], dist[1], dist[2] };
+        
+        if (insideCount == 1) {
+            // Cycle until v[0] is the inside point
+            while (d[0] < 0) {
+                Vector3D tv = v[0]; v[0] = v[1]; v[1] = v[2]; v[2] = tv;
+                double td = d[0]; d[0] = d[1]; d[1] = d[2]; d[2] = td;
+            }
+            
+            // New Triangle: Inside, Intersect(In->Out1), Intersect(In->Out2)
+            Vector3D p1 = v[0];
+            Vector3D p2 = intersectPlane(planePoint, planeNormal, v[0], v[1]);
+            Vector3D p3 = intersectPlane(planePoint, planeNormal, v[0], v[2]);
+            
+            outTriangles.add(new Triangle(p1, p2, p3, inTri.color));
+            
+        } else if (insideCount == 2) {
+            // Cycle until v[2] is the outside point
+            while (d[2] >= 0) {
+                Vector3D tv = v[0]; v[0] = v[1]; v[1] = v[2]; v[2] = tv;
+                double td = d[0]; d[0] = d[1]; d[1] = d[2]; d[2] = td;
+            }
+            
+            // Quad formed by 2 Triangles
+            // Tri 1: In1, In2, Intersect(In2->Out)
+            // Tri 2: In1, Intersect(In2->Out), Intersect(In1->Out)
+            
+            Vector3D p1 = v[0];
+            Vector3D p2 = v[1];
+            Vector3D p3 = intersectPlane(planePoint, planeNormal, v[1], v[2]);
+            Vector3D p4 = intersectPlane(planePoint, planeNormal, v[0], v[2]);
+            
+            outTriangles.add(new Triangle(p1, p2, p3, inTri.color));
+            outTriangles.add(new Triangle(p1, p3, p4, inTri.color));
+        }
+        
+        return outTriangles;
+    }
+    
+    /**
+     * Calculates the intersection point of a line segment and a plane.
+     */
+    private Vector3D intersectPlane(Vector3D planeP, Vector3D planeN, Vector3D lineStart, Vector3D lineEnd) {
+        planeN = planeN.normalize();
+        double planeD = -planeN.dotProduct(planeP);
+        double ad = lineStart.dotProduct(planeN);
+        double bd = lineEnd.dotProduct(planeN);
+        double t = (-planeD - ad) / (bd - ad);
+        Vector3D lineStartToEnd = lineEnd.subtract(lineStart);
+        Vector3D lineToIntersect = lineStartToEnd.multiply(t);
+        return lineStart.add(lineToIntersect);
+    }}

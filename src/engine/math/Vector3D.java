@@ -25,6 +25,24 @@ public class Vector3D {
     }
 
     /**
+     * Adds another vector to this one.
+     * Result = This + V
+     * @return A new Vector3D result.
+     */
+    public Vector3D add(Vector3D v) {
+        return new Vector3D(x + v.x, y + v.y, z + v.z);
+    }
+
+    /**
+     * Multiplies the vector by a scalar value.
+     * Result = This * scalar
+     * @return A new Vector3D result.
+     */
+    public Vector3D multiply(double scalar) {
+        return new Vector3D(x * scalar, y * scalar, z * scalar);
+    }
+
+    /**
      * Calculates the Dot Product (Scalar product).
      * <p>
      * The Dot Product tells us how much two vectors are pointing in the same direction.
